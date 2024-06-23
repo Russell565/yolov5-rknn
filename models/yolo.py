@@ -213,7 +213,8 @@ class BaseModel(nn.Module):
 
 class DetectionModel(BaseModel):
     # YOLOv5 detection model
-    def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None):  # model, input channels, number of classes
+    # def __init__(self, cfg='yolov5s.yaml', ch=3, nc=None, anchors=None):  # model, input channels, number of classes
+    def __init__(self, cfg='yolov5s.yaml', ch=1, nc=None, anchors=None):  # CZJ train GRAY
         super().__init__()
         if isinstance(cfg, dict):
             self.yaml = cfg  # model dict

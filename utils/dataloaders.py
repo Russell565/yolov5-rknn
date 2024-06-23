@@ -301,7 +301,8 @@ class LoadImages:
         else:
             # Read image
             self.count += 1
-            im0 = cv2.imread(path)  # BGR
+            # im0 = cv2.imread(path)  # BGR
+            im0 = cv2.imread(path, 0)  # CZJ train GRAY
             assert im0 is not None, f'Image Not Found {path}'
             s = f'image {self.count}/{self.nf} {path}: '
 
@@ -695,7 +696,7 @@ class LoadImagesAndLabels(Dataset):
             nl = len(labels)  # update after albumentations
 
             # HSV color-space
-            augment_hsv(img, hgain=hyp['hsv_h'], sgain=hyp['hsv_s'], vgain=hyp['hsv_v'])
+            # augment_hsv(img, hgain=hyp['hsv_h'], sgain=hyp['hsv_s'], vgain=hyp['hsv_v']) # CZJ train GRAY
 
             # Flip up-down
             if random.random() < hyp['flipud']:
@@ -718,7 +719,9 @@ class LoadImagesAndLabels(Dataset):
             labels_out[:, 1:] = torch.from_numpy(labels)
 
         # Convert
-        img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        # img = img.transpose((2, 0, 1))[::-1]  # HWC to CHW, BGR to RGB
+        img = img.reshape(1, img.shape[0], img.shape[1]) # CZJ train GRAY
+        
         img = np.ascontiguousarray(img)
 
         return torch.from_numpy(img), labels_out, self.im_files[index], shapes
@@ -730,7 +733,8 @@ class LoadImagesAndLabels(Dataset):
             if fn.exists():  # load npy
                 im = np.load(fn)
             else:  # read image
-                im = cv2.imread(f)  # BGR
+                # im = cv2.imread(f)  # BGR
+                im = cv2.imread(f,0 )  # CZJ train GRAY
                 assert im is not None, f'Image Not Found {f}'
             h0, w0 = im.shape[:2]  # orig hw
             r = self.img_size / max(h0, w0)  # ratio
@@ -1103,7 +1107,8 @@ class HUBDatasetStats():
             im.save(f_new, 'JPEG', quality=50, optimize=True)  # save
         except Exception as e:  # use OpenCV
             LOGGER.info(f'WARNING ⚠️ HUB ops PIL failure {f}: {e}')
-            im = cv2.imread(f)
+            # im = cv2.imread(f)
+            im = cv2.imread(f,0)  # CZJ train GRAY
             im_height, im_width = im.shape[:2]
             r = max_dim / max(im_height, im_width)  # ratio
             if r < 1.0:  # image too large
@@ -1179,13 +1184,16 @@ class ClassificationDataset(torchvision.datasets.ImageFolder):
     def __getitem__(self, i):
         f, j, fn, im = self.samples[i]  # filename, index, filename.with_suffix('.npy'), image
         if self.cache_ram and im is None:
-            im = self.samples[i][3] = cv2.imread(f)
+            # im = self.samples[i][3] = cv2.imread(f)
+            im = self.samples[i][3] = cv2.imread(f,0)  # CZJ train GRAY
         elif self.cache_disk:
             if not fn.exists():  # load npy
-                np.save(fn.as_posix(), cv2.imread(f))
+                # np.save(fn.as_posix(), cv2.imread(f))
+                np.save(fn.as_posix(), cv2.imread(f,0))  # CZJ train GRAY
             im = np.load(fn)
         else:  # read image
-            im = cv2.imread(f)  # BGR
+            # im = cv2.imread(f)  # BGR
+            im = cv2.imread(f,0)  # CZJ train GRAY
         if self.album_transforms:
             sample = self.album_transforms(image=cv2.cvtColor(im, cv2.COLOR_BGR2RGB))["image"]
         else:
