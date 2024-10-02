@@ -2,21 +2,25 @@
 # Usage: pip install -r requirements.txt
 
 # Base ------------------------------------------------------------------------
-gitpython
-ipython  # interactive notebook
-matplotlib>=3.2.2
-numpy>=1.18.5
-opencv-python>=4.1.1
+
+# base deps
+protobuf==3.20.3
+
+# utils
+psutil>=5.9.0
+ruamel.yaml>=0.17.21
+scipy>=1.9.3
+tqdm>=4.64.1
+opencv-python>=4.5.5.64
+fast-histogram>=0.11
+numpy<=1.26.4
 Pillow>=7.1.2
-psutil  # system resources
 PyYAML>=5.3.1
 requests>=2.23.0
-scipy>=1.4.1
 thop>=0.1.1  # FLOPs computation
-torch>=1.7.0  # see https://pytorch.org/get-started/locally (recommended)
-torchvision>=0.8.1
-tqdm>=4.64.0
-# protobuf<=3.20.1  # https://github.com/ultralytics/yolov5/issues/8012
+matplotlib>=3.2.2
+gitpython
+ipython  # interactive notebook
 
 # Logging ---------------------------------------------------------------------
 tensorboard>=2.4.1
@@ -27,23 +31,9 @@ tensorboard>=2.4.1
 pandas>=1.1.4
 seaborn>=0.11.0
 
-# Export ----------------------------------------------------------------------
-# coremltools>=6.0  # CoreML export
-# onnx>=1.9.0  # ONNX export
-# onnx-simplifier>=0.4.1  # ONNX simplifier
-# nvidia-pyindex  # TensorRT export
-# nvidia-tensorrt  # TensorRT export
-# scikit-learn<=1.1.2  # CoreML quantization
-# tensorflow>=2.4.1  # TF exports (-cpu, -aarch64, -macos)
-# tensorflowjs>=3.9.0  # TF.js export
-# openvino-dev  # OpenVINO export
-
-# Deploy ----------------------------------------------------------------------
-# tritonclient[all]~=2.24.0
-
-# Extras ----------------------------------------------------------------------
-# mss  # screenshots
-# albumentations>=1.0.3
-# pycocotools>=2.0  # COCO mAP
-# roboflow
-# ultralytics  # HUB https://hub.ultralytics.com
+# base
+onnx==1.14.1
+onnxoptimizer==0.3.8
+onnxruntime==1.16.0
+torch>=1.13.1,<=2.1.0
+tensorflow==2.8.1
