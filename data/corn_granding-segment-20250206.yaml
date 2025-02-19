@@ -1,0 +1,12 @@
+# Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
+path: /home/user/cv_project/corn-detection/dataset # GPU服务器目录
+train: quexian # train images (relative to 'path') 128 images
+val: quexian  # val images (relative to 'path') 128 images
+test: quexian/images
+
+# Classes
+names:
+  0: queli
+  1: huaili
+  2: bieli
+

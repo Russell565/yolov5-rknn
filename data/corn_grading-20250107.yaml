@@ -8,13 +8,12 @@
 
 
 # Train/val/test sets as 1) dir: path/to/imgs, 2) file: path/to/imgs.txt, or 3) list: [path/to/imgs1, path/to/imgs2, ..]
-path: /home/user/cv_project/corn-detection/dataset/20241031_split_corn_datasets # dataset root dir
+path: /home/user/cv_project/corn-detection/dataset/20250107split_corn # GPU服务器目录
 train: train # train images (relative to 'path') 128 images
 val: val  # val images (relative to 'path') 128 images
 test: test/images
 # Classes
 names:
-  0: corn_right
-  1: corn_left
-
-
+  0: corn
+  1: tujian
+  
