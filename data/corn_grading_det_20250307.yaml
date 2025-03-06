@@ -1,0 +1,15 @@
+path: ../datasets/corn_grading_det  # dataset root dir
+train:
+  - images/arvalis_1
+  - images/arvalis_2
+val:
+  - images/ethz_1
+test:
+  - images/utokyo_1
+  - images/utokyo_2
+
+# Classes
+names:
+  0: corn
+  1: tujian
+
