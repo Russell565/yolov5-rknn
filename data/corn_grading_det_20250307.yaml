@@ -1,12 +1,10 @@
 path: ../datasets/corn_grading_det  # dataset root dir
 train:
-  - images/arvalis_1
-  - images/arvalis_2
+  - 20250307_corn_grading_det_dataset/train
 val:
-  - images/ethz_1
+  - 20250307_corn_grading_det_dataset/val
 test:
-  - images/utokyo_1
-  - images/utokyo_2
+  - test
 
 # Classes
 names:
