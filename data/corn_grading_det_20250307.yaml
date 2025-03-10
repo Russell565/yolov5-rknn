@@ -1,4 +1,5 @@
-path: ../datasets/corn_grading_det  # dataset root dir
+# path: ../dataset/corn_grading_det  # 实验室服务器路径
+path: ../dataset/20250307-corn-grading-det  # spb-gpu服务器路径
 train:
   - 20250307_corn_grading_det_dataset/train
 val:

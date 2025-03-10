@@ -1,0 +1,11 @@
+path: ../dataset/corn_grading_seg  # 实验室服务器路径
+train: 20250307_corn_grading_seg_dataset/train
+val: 20250307_corn_grading_seg_dataset/train
+test: test
+
+# Classes
+names:
+  0: queli
+  1: huaili
+  2: bieli
+
