@@ -78,6 +78,13 @@ def create_dataloader(path,
     ), dataset
 
 
+
+def img2labelseg_paths(img_paths):
+    # Define label paths as a function of image paths
+    sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_seg{os.sep}'  # /images/, /labels_seg/ substrings
+    return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.txt' for x in img_paths]
+
+
 class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
 
     def __init__(
@@ -102,6 +109,10 @@ class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
                          stride, pad, min_items, prefix)
         self.downsample_ratio = downsample_ratio
         self.overlap = overlap
+
+    def init_labels_files(self):
+        # 替换标签路径生产逻辑，分割标签从labels_seg目录中读取
+        self.label_files = img2labelseg_paths(self.im_files)
 
     def __getitem__(self, index):
         index = self.indices[index]  # linear, shuffled, or image_weights

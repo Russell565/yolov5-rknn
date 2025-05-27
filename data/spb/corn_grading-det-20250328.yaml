@@ -1,0 +1,11 @@
+path: /home/user/cv_project/corn-detection/dataset/20250328_corn_grading_det_dataset # 我们服务器路径
+train: train
+val: val
+test: test
+
+# Classes
+names:
+  0: corn
+  1: tujian
+
+# 白色玉米的检测模型训练
