@@ -1,0 +1,16 @@
+path: /home/user/cv_project/corn-detection/dataset/20250722_corn_test/2025-07-22corn-seg-1000pic # 我们服务器路径
+train:
+  - train
+val:
+  - valid
+test: test
+
+nc: 1
+names: ['corn']
+
+roboflow:
+  workspace: cv-hmqgz
+  project: corn_seg
+  version: 2
+  license: CC BY 4.0
+  url: https://universe.roboflow.com/cv-hmqgz/corn_seg/dataset/2
