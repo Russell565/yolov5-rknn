@@ -1,0 +1,14 @@
+path: /home/user/cv_project/corn-detection/dataset/20250728 # 我们服务器路径
+train:
+  - 20250728_bai_corn_grading_det_dataset/train
+val:
+  - 20250728_bai_corn_grading_det_dataset/val
+test: test
+
+# Classes
+names:
+  0: queli
+  1: huaili
+  2: bieli
+  3: Hua
+  4: ranse

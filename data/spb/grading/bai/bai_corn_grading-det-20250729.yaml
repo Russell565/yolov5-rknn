@@ -1,0 +1,11 @@
+path: /home/user/cv_project/corn-detection/dataset/20250729 # 我们服务器路径
+train:
+  - 20250729_bai_corn_grading_det_dataset/train
+val:
+  - 20250729_bai_corn_grading_det_dataset/val
+test: test
+
+# Classes
+names:
+  0: corn
+  1: tujian

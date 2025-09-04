@@ -1,0 +1,11 @@
+path: /home/user/cv_project/corn-detection/dataset/zihei/summary # 我们服务器路径
+train: train
+val: valid
+test: test
+
+# Classes
+names:
+  0: corn
+  1: tujian
+
+# 紫黑玉米的检测模型训练

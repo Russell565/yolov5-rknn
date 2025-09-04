@@ -1,0 +1,9 @@
+path: /home/user/cv_project/corn-detection/dataset/20250817 # 我们服务器路径
+train:
+  - 20250817_huang_corn_grading_det_dataset/train
+val:
+  - 20250817_huang_corn_grading_det_dataset/val
+test: test
+
+nc: 1
+names: ['corn']
