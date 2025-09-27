@@ -1,0 +1,17 @@
+path: /home/user/cv_project/corn-detection/dataset/20250926/huang # 我们服务器路径
+train:
+  - 20250926_huang_corn_grading_det_dataset/train
+val:
+  - 20250926_huang_corn_grading_det_dataset/val
+test: test
+
+# Classes
+names:
+  0: corn
+  1: tujian
+
+# 黄冻玉米检测模型。使用数据如下：
+#1. 冻玉米/20250306/20250306_pm_corn_grading_det_part1
+#2. 冻玉米/20250308/20250308_corn_grading_det_part1
+#3. 冻玉米/20250309/20250309_huang_corn_grading_det_part1
+#4. 冻玉米/20250417/20250417_huang_corn_grading_det_part1

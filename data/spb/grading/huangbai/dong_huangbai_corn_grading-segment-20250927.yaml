@@ -1,0 +1,17 @@
+path: /home/user/cv_project/corn-detection/dataset/20250927 # 学校服务器路径
+train:
+  - 20250927_huangbai_corn_grading_det_dataset/train
+val:
+  - 20250927_huangbai_corn_grading_det_dataset/val
+test: test
+
+# Classes
+names:
+  0: queli
+  1: huaili
+  2: bieli
+  3: Hua
+  4: meichong
+  5: duanlie
+  6: jiya
+  7: ranse
