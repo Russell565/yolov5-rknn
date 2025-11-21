@@ -33,6 +33,7 @@ import sys
 from pathlib import Path
 
 import torch
+import numpy as np
 
 FILE = Path(__file__).resolve()
 ROOT = FILE.parents[1]  # YOLOv5 root directory
@@ -81,7 +82,8 @@ def run(
     dnn=False,  # use OpenCV DNN for ONNX inference
     vid_stride=1,  # video frame-rate stride
     retina_masks=False,
-    corn_len_calc=False
+    corn_len_calc=False,
+    save_masks=False  # save segmentation masks as class ID maps
 ):
     source = str(source)
     save_img = not nosave and not source.endswith('.txt')  # save inference images
@@ -95,6 +97,8 @@ def run(
     # Directories
     save_dir = increment_path(Path(project) / name, exist_ok=exist_ok)  # increment run
     (save_dir / 'labels' if save_txt else save_dir).mkdir(parents=True, exist_ok=True)  # make dir
+    if save_masks:
+        (save_dir / 'masks').mkdir(parents=True, exist_ok=True)  # make masks directory
 
     # Load model
     device = select_device(device)
@@ -160,6 +164,21 @@ def run(
                 if save_txt:
                     segments = reversed(masks2segments(masks))
                     segments = [scale_segments(im.shape[2:], x, im0.shape, normalize=True) for x in segments]
+                
+                # Create class ID mask if save_masks is enabled
+                if save_masks:
+                    # Initialize mask with background (class 0)
+                    class_id_mask = np.zeros(im0.shape[:2], dtype=np.uint8)
+                    # Process each detection and assign class ID to mask
+                    for j, (*xyxy, conf, cls) in enumerate(reversed(det[:, :6])):
+                        # Convert PyTorch tensor to numpy array and threshold to boolean
+                        mask_j = masks[j].cpu().numpy() > 0.5
+                        # Resize mask to match original image dimensions
+                        mask_j_resized = cv2.resize(mask_j.astype(np.uint8), 
+                                                  (im0.shape[1], im0.shape[0]), 
+                                                  interpolation=cv2.INTER_NEAREST)
+                        # Assign class ID (adding 1 to distinguish from background)
+                        class_id_mask[mask_j_resized > 0] = int(cls) + 1
 
                 # Print results
                 for c in det[:, 5].unique():
@@ -191,6 +210,11 @@ def run(
                         # annotator.draw.polygon(segments[j], outline=colors(c, True), width=3)
                     if save_crop:
                         save_one_box(xyxy, imc, file=save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
+                
+                # Save class ID mask as text file
+                if save_masks:
+                    mask_file = save_dir / 'masks' / f'{p.stem}.txt'
+                    np.savetxt(mask_file, class_id_mask, fmt='%d')
 
             # Stream results
             im0 = annotator.result()
@@ -266,6 +290,7 @@ def parse_opt():
     parser.add_argument('--vid-stride', type=int, default=1, help='video frame-rate stride')
     parser.add_argument('--retina-masks', action='store_true', help='whether to plot masks in native resolution')
     parser.add_argument('--corn-len-calc', action='store_true', help='when calculate corn length')
+    parser.add_argument('--save-masks', action='store_true', help='save segmentation masks as class ID maps to *.txt')
     opt = parser.parse_args()
     opt.imgsz *= 2 if len(opt.imgsz) == 1 else 1  # expand
     print_args(vars(opt))
