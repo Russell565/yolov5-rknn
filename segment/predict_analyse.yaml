@@ -1,0 +1,93 @@
+# YOLOv5分割推理配置文件
+
+# 模型权重文件路径
+weights: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20251119鲜果4cls分割模型/weights/best.pt  # 推理模型权重文件
+
+# 是否保存推理结果的标签
+save_txt: true  # 保存结果到*.txt文件
+
+# 是否保存原图与推理图对比
+# true: 保存对比图，false: 只保存推理图
+is_compare: true
+
+# 是否保存结果图像
+# true: 不保存图像，false: 保存图像	nosave: false
+
+# 类别定义：数字ID与中文名称的对应关系
+class:
+  "0": "鲜果"
+  "1": "缺陷果"
+  "2": "异形果"
+  "3": "坏果"
+
+# 是否启用推理结果分析
+# true: 生成分析报告，false: 不生成分析报告
+is_analyze: true
+
+# 输出总目录名称，所有推理结果将保存在这个总目录下
+output_main_dir: inference_results_1124
+
+# 源图像和标签目录对列表
+source_label_pairs:
+  # 推理目录和对应分割标签目录对
+  - source: /data/train_data/dataset/xianguo_project/train/1119/train_data_1119/lib_shoot_middle/test/images
+    label_dir: /data/train_data/dataset/xianguo_project/train/1119/train_data_1119/lib_shoot_middle/test/labels_seg
+    save_dir_name: xianguo_middle_1119  # 自定义输出目录名称
+  - source: /data/train_data/dataset/xianguo_project/train/1119/train_data_1119/lib_shoot_right/test/images
+    label_dir: /data/train_data/dataset/xianguo_project/train/1119/train_data_1119/lib_shoot_right/test/labels_seg
+    save_dir_name: xianguo_right_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1119/train_data_1119/lib_shoot_left/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1119/train_data_1119/lib_shoot_left/test/labels_seg
+  #   save_dir_name: xianguo_left_1119
+
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/cucao/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/cucao/test/labels_seg
+  #   save_dir_name: cucao_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/diaobing/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/diaobing/test/labels_seg
+  #   save_dir_name: diaobing_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/dongshang/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/dongshang/test/labels_seg
+  #   save_dir_name: dongshang_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/empty/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/empty/test/labels_seg
+  #   save_dir_name: empty_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/heiban/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/heiban/test/labels_seg
+  #   save_dir_name: heiban_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/huaiguo/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/huaiguo/test/labels_seg
+  #   save_dir_name: huaiguo_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/kuiyang/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/kuiyang/test/labels_seg
+  #   save_dir_name: kuiyang_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/lieguo/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/lieguo/test/labels_seg
+  #   save_dir_name: lieguo_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/lvban/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/lvban/test/labels_seg
+  #   save_dir_name: lvban_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/qingguo/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/qingguo/test/labels_seg
+  #   save_dir_name: qingguo_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/qiyiguo/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/qiyiguo/test/labels_seg
+  #   save_dir_name: qiyiguo_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/rishaiguo/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/rishaiguo/test/labels_seg
+  #   save_dir_name: rishaiguo_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/shapi/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/shapi/test/labels_seg
+  #   save_dir_name: shapi_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/taifengba/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/taifengba/test/labels_seg
+  #   save_dir_name: taifengba_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/taifengba_/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/taifengba_/test/labels_seg
+  #   save_dir_name: taifengba__1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/youzi/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/youzi/test/labels_seg
+  #   save_dir_name: youzi_1119
+  # - source: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/zhengchang/test/images
+  #   label_dir: /data/train_data/dataset/xianguo_project/train/1114/train_data_1114/zhengchang/test/labels_seg
+  #   save_dir_name: zhengchang_1119
