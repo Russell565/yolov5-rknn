@@ -166,10 +166,12 @@ class InfiniteDataLoader(dataloader.DataLoader):
         self.iterator = super().__iter__()
 
     def __len__(self):
+        # Fix for DDP training with drop_last=True: dynamically return current sampler length
         return len(self.batch_sampler.sampler)
 
     def __iter__(self):
-        for _ in range(len(self)):
+        # Fix for DDP training with drop_last=True: remove length restriction, let _RepeatSampler handle infinite iteration
+        while True:
             yield next(self.iterator)
 
 
@@ -721,6 +723,14 @@ class LoadImagesAndLabels(Dataset):
                 img = np.fliplr(img)
                 if nl:
                     labels[:, 1] = 1 - labels[:, 1]
+
+            # 只在有灰度增强参数时才执行相关代码
+            if hyp.get('gray', 0) > 0:  # 有参数且大于0时才进入
+                # To Gray
+                if random.random() < hyp['gray']:
+                    img = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+                    img = np.stack((img,) * 3, axis=-1)  # convert to 3-channel grayscale
+   
 
             # Cutouts
             # labels = cutout(img, labels, p=0.5)

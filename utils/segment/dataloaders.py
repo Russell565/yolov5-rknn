@@ -63,7 +63,8 @@ def create_dataloader(path,
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
     nw = min([os.cpu_count() // max(nd, 1), batch_size if batch_size > 1 else 0, workers])  # number of workers
-    sampler = None if rank == -1 else distributed.DistributedSampler(dataset, shuffle=shuffle)
+    # sampler = None if rank == -1 else distributed.DistributedSampler(dataset, shuffle=shuffle)
+    sampler = None if rank == -1 else distributed.DistributedSampler(dataset, shuffle=shuffle, drop_last=True)
     loader = DataLoader if image_weights else InfiniteDataLoader  # only DataLoader allows for attribute updates
     generator = torch.Generator()
     generator.manual_seed(6148914691236517205 + RANK)
@@ -87,6 +88,8 @@ def img2labelseg_paths(img_paths, only_corn=0):
         sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_corn_seg{os.sep}'  # /images/, /labels_seg/ substrings
     elif only_corn == 0:
         sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_seg{os.sep}'  # /images/, /labels_seg/ substrings
+    elif only_corn == 2:
+        sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_seg_defect{os.sep}'
 
     return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.txt' for x in img_paths]
 
@@ -117,7 +120,8 @@ class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
                          stride, pad, min_items, prefix)
         self.downsample_ratio = downsample_ratio
         self.overlap = overlap
-
+        self.init_labels_files()
+        
     def init_labels_files(self):
         # 替换标签路径生产逻辑，分割标签从labels_seg目录中读取
         self.label_files = img2labelseg_paths(self.im_files, self.only_corn)

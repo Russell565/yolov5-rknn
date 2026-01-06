@@ -238,7 +238,10 @@ def run(
     jdict, stats = [], []
     # callbacks.run('on_val_start')
     pbar = tqdm(dataloader, desc=s, bar_format=TQDM_BAR_FORMAT)  # progress bar
+    val_nb = len(dataloader)  # number of batches for validation
     for batch_i, (im, targets, paths, shapes, masks) in enumerate(pbar):
+        if batch_i >= val_nb:  # 修复InfiniteDataLoader无限迭代导致的验证无法结束问题
+            break
         # callbacks.run('on_val_batch_start')
         with dt[0]:
             if cuda:
