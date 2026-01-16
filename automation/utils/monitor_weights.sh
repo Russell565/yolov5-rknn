@@ -191,36 +191,79 @@ main() {
                 done
             fi
         
-        # 检查训练是否结束（通过检查是否存在train-finished.txt文件）
+        # 检测训练是否结束的多种机制
+        train_finished=false
+        
+        # 1. 检查是否存在train-finished.txt文件（手动标记）
         if [ -f "$PROJECT/$NAME/train-finished.txt" ]; then
-            log_info "检测到训练结束标志，准备测试last.pt和best.pt"
-            
-            # 训练结束，测试last.pt和best.pt
-            log_info "开始测试训练结束后的特殊权重文件..."
-            
-            # 测试last.pt
-            LAST_PT="$WEIGHTS_DIR/last.pt"
-            if [ -f "$LAST_PT" ]; then
-                log_info "测试last.pt: $LAST_PT"
-                LAST_TEST_CMD="bash \"$CURRENT_DIR/../test/run_test.sh\" \"$CONFIG_FILE\" \"$LAST_PT\""
-                log_info "执行测试命令: $LAST_TEST_CMD"
-                bash "$CURRENT_DIR/../test/run_test.sh" "$CONFIG_FILE" "$LAST_PT"
-                
-                if [ $? -eq 0 ]; then
-                    log_success "last.pt测试完成"
-                    echo "$(date '+%Y-%m-%d %H:%M:%S') - TESTED: $LAST_PT (训练结束后测试)" >> "$MONITOR_LOG"
-                    # 发送测试结果通知
-                    TEST_RESULT_FILE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['result']['file_path'])")
-                    send_test_result_notification "$CONFIG_FILE" "$LAST_PT" "$TEST_RESULT_FILE"
-                else
-                    log_error "last.pt测试失败"
-                    echo "$(date '+%Y-%m-%d %H:%M:%S') - FAILED: $LAST_PT (训练结束后测试)" >> "$MONITOR_LOG"
-                    # 发送错误通知
-                    send_error_notification "$CONFIG_FILE" "test_failure" "测试last.pt失败"
+            log_info "检测到训练结束标志文件: $PROJECT/$NAME/train-finished.txt"
+            train_finished=true
+        fi
+        
+        # 2. 检查训练进程是否存在（如果能获取到PID）
+        if [ -f "$CURRENT_DIR/../train.pid" ]; then
+            TRAIN_PID=$(cat "$CURRENT_DIR/../train.pid" 2>/dev/null || echo "")
+            if [ -n "$TRAIN_PID" ]; then
+                if ! ps -p "$TRAIN_PID" > /dev/null 2>&1; then
+                    log_info "检测到训练进程 $TRAIN_PID 已结束"
+                    train_finished=true
                 fi
-            else
-                log_info "last.pt文件不存在，跳过测试"
             fi
+        fi
+        
+        # 3. 检查训练日志，寻找训练结束关键词（更精确的关键词匹配）
+        TRAIN_LOG=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['log']['log_file'])")
+        if [ -f "$TRAIN_LOG" ]; then
+            # 检测训练结束关键词（根据实际训练代码输出定制）
+            if grep -q "Stopping training early" "$TRAIN_LOG" || \
+               grep -q "epochs completed in" "$TRAIN_LOG" || \
+               grep -q "Results saved to" "$TRAIN_LOG" || \
+               grep -q "Validating.*best.pt" "$TRAIN_LOG"; then
+                # 检查是否有最近的训练活动
+                # 获取最后20行日志，检查是否有最近的训练活动（如Epoch信息）
+                recent_epochs=$(tail -n 20 "$TRAIN_LOG" | grep -i "\[.*\] Epoch" | wc -l)
+                if [ "$recent_epochs" -eq 0 ]; then
+                    # 最近20行日志中没有Epoch信息，可能训练已经结束
+                    log_info "从训练日志检测到训练结束迹象"
+                    train_finished=true
+                fi
+            fi
+        fi
+        
+        # 4. 检查best.pt和last.pt是否都存在（训练结束后应该都存在）
+        if [ -f "$WEIGHTS_DIR/best.pt" ] && [ -f "$WEIGHTS_DIR/last.pt" ]; then
+            # 检查文件修改时间，如果超过30分钟没有更新，可能训练已经结束
+            best_mtime=$(stat -c %Y "$WEIGHTS_DIR/best.pt")
+            last_mtime=$(stat -c %Y "$WEIGHTS_DIR/last.pt")
+            current_time=$(date +%s)
+            best_age=$((current_time - best_mtime))
+            last_age=$((current_time - last_mtime))
+            
+            if [ $best_age -gt 1800 ] && [ $last_age -gt 1800 ]; then
+                # 两个文件都超过30分钟没有更新，可能训练已经结束
+                log_info "检测到best.pt和last.pt超过30分钟没有更新"
+                train_finished=true
+            fi
+        fi
+        
+        # 5. 检查DDP训练进程是否都已结束（通过查找相关python进程）
+        # 使用ps命令查找所有与YOLOv5训练相关的进程
+        train_processes=$(ps aux | grep -i "python.*train.py" | grep -v "grep" | wc -l)
+        if [ "$train_processes" -eq 0 ]; then
+            # 没有找到YOLOv5训练进程，可能训练已经结束
+            log_info "检测到没有YOLOv5训练进程在运行"
+            train_finished=true
+        fi
+        
+        # 如果检测到训练结束，执行后续操作
+        if [ "$train_finished" = true ]; then
+            log_info "确定训练已结束，准备测试best.pt"
+            
+            # 标记训练结束，创建标志文件
+            touch "$PROJECT/$NAME/train-finished.txt"
+            
+            # 训练结束，只测试best.pt
+            log_info "开始测试训练结束后的最佳权重文件..."
             
             # 测试best.pt
             BEST_PT="$WEIGHTS_DIR/best.pt"
@@ -237,9 +280,22 @@ main() {
                     TEST_RESULT_FILE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['result']['file_path'])")
                     send_test_result_notification "$CONFIG_FILE" "$BEST_PT" "$TEST_RESULT_FILE"
                     # 发送训练结束通知
-                    # 获取最新的epoch值
-                    latest_epoch=$(python3 -c "import pandas as pd; df=pd.read_excel('$TEST_RESULT_FILE'); print(df['Epoch'].max())")
-                    send_train_end_notification "$CONFIG_FILE" "$latest_epoch" "N/A"
+                    # 从训练日志中提取实际训练轮次
+                    TRAIN_LOG=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['log']['log_file'])")
+                    if [ -f "$TRAIN_LOG" ]; then
+                        # 从日志中提取实际训练轮次
+                        actual_epochs=$(grep -o "[0-9]\+ epochs completed" "$TRAIN_LOG" | grep -o "^[0-9]\+")
+                        if [ -z "$actual_epochs" ]; then
+                            # 如果无法从日志提取，使用最佳模型对应的epoch
+                            actual_epochs=$(grep -o "best results observed at epoch [0-9]\+" "$TRAIN_LOG" | grep -o "[0-9]\+$")
+                            if [ -z "$actual_epochs" ]; then
+                                actual_epochs="未知"
+                            fi
+                        fi
+                    else
+                        actual_epochs="未知"
+                    fi
+                    send_train_end_notification "$CONFIG_FILE" "$actual_epochs"
                 else
                     log_error "best.pt测试失败"
                     echo "$(date '+%Y-%m-%d %H:%M:%S') - FAILED: $BEST_PT (训练结束后测试)" >> "$MONITOR_LOG"
@@ -249,6 +305,10 @@ main() {
             else
                 log_info "best.pt文件不存在，跳过测试"
             fi
+            
+            # 执行模型转换
+            log_info "开始执行模型转换..."
+            bash "$CURRENT_DIR/run_model_conversion.sh" "$CONFIG_FILE"
             
             log_info "训练结束，退出监控"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - TRAIN FINISHED, EXITING" >> "$MONITOR_LOG"

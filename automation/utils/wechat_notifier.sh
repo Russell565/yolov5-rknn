@@ -210,11 +210,9 @@ send_train_start_notification() {
 # 参数：
 # $1: 配置文件路径
 # $2: 实际训练轮次
-# $3: 最佳fitness
 send_train_end_notification() {
     local config_file=$1
     local actual_epochs=$2
-    local best_fitness=$3
     
     # 确保使用绝对路径
     local abs_config_file=$(readlink -f "$config_file")
@@ -239,11 +237,7 @@ send_train_end_notification() {
 - 结束时间: $(date '+%Y-%m-%d %H:%M:%S')
 - 结果目录: $project_path
 
-**最终指标**
-- 最佳Fitness: $best_fitness
-
 **模型文件**
-- last.pt: 最终训练结果
 - best.pt: 最佳性能模型
     """
     
