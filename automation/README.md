@@ -2,7 +2,7 @@
 
 ## 系统概述
 
-本自动化系统用于YOLOv5模型的训练、测试和模型转换，通过配置文件统一管理所有参数，实现灵活的训练/测试任务调度。
+本自动化系统用于YOLOv5模型的训练、测试、模型转换、SFTP推送和远程板子测试，通过配置文件统一管理所有参数，实现灵活的训练/测试/部署任务调度。
 
 ## 目录结构
 
@@ -18,10 +18,13 @@ automation/
 │   ├── run_test.sh            # 测试任务执行脚本
 │   └── eval/
 │       └── run_eval.sh        # 测试评估脚本
-└── utils/
-    ├── run_model_conversion.sh # 模型转换脚本
-    ├── wechat_notifier.sh     # 微信通知脚本
-    └── monitor_weights.sh     # 权重监控脚本
+├── utils/
+│   ├── run_model_conversion.sh # 模型转换脚本
+│   ├── run_sftp_push.py       # SFTP推送脚本
+│   ├── wechat_notifier.sh     # 微信通知脚本
+│   └── monitor_weights.sh     # 权重监控脚本
+└── src/
+    └── run_test.sh            # 远程板子测试脚本
 ```
 
 ## 配置文件说明
@@ -34,6 +37,8 @@ automation/
 4. **class_config**：类别配置，定义类别对照表
 5. **wechat**：微信推送配置，包括推送开关、节点开关和消息模板
 6. **model_conversion**：模型转换配置，包括转换开关、输出路径和转换参数
+7. **sftp**：SFTP推送配置，包括连接参数、文件列表和远程执行脚本配置
+8. **board_test**：板子测试配置，包括测试命令、模型文件和临时路径配置
 
 ## 使用方法
 
@@ -47,6 +52,8 @@ automation/
 - `train.extra_params`：设置扩展训练参数
 - `test.dataset_config`：设置测试数据集配置
 - `train.model_conversion`：设置模型转换配置
+- `sftp`：设置SFTP推送配置
+- `board_test`：设置板子测试配置
 
 ### 2. 执行主脚本
 
@@ -70,6 +77,11 @@ cd /home/user/cv_project/corn-detection/yolov5-rknn-self/automation
 #### 执行模型转换
 ```bash
 ./utils/run_model_conversion.sh config.yaml
+```
+
+#### 执行SFTP推送
+```bash
+python3 ./utils/run_sftp_push.py config.yaml
 ```
 
 #### 终止所有自动化进程
@@ -103,14 +115,32 @@ cd /home/user/cv_project/corn-detection/yolov5-rknn-self/automation
 - 支持配置需要转换的权重文件
 - 支持配置转换参数和输出路径
 
-### 4. 微信推送功能
+### 4. SFTP推送功能
 
-- 支持训练开始、训练结束、测试结果、模型转换结果等关键节点的微信通知
+- 支持多文件SFTP推送配置
+- 支持配置源文件路径和目标路径
+- 支持远程脚本执行
+- 支持推送状态微信通知
+- 支持多文件推送模式
+
+### 5. 远程板子测试功能
+
+- 支持远程执行测试脚本
+- 支持配置测试命令和参数
+- 支持日志重定向到输出文件
+- 支持备份/恢复机制
+- 支持纯bash YAML解析（无Python依赖）
+- 支持测试结果微信通知
+
+### 6. 微信推送功能
+
+- 支持训练开始、训练结束、测试结果、模型转换结果、SFTP推送结果、板子测试结果等关键节点的微信通知
 - 支持配置推送开关和节点开关
 - 支持自定义消息模板
 - 支持异常情况通知
+- 支持通知内容定制
 
-### 5. 权重监控功能
+### 7. 权重监控功能
 
 - 支持监控训练生成的权重文件
 - 支持配置监控间隔和监控路径
@@ -181,7 +211,12 @@ wechat:
     train_end: 1
     test_result: 1
     model_conversion: 1
+    sftp_push: 1
+    board_test: 1
     error: 1
+  templates:
+    sftp_push: "SFTP推送结果通知"
+    board_test: "板子测试结果通知"
 ```
 
 ### 模型转换配置示例
@@ -196,13 +231,53 @@ model_conversion:
     - /path/to/weights2.pt
 ```
 
+### SFTP推送配置示例
+
+```yaml
+sftp:
+  open: 1
+  host: 10.17.3.150
+  port: 22
+  username: root
+  password: password
+  files:
+    - local_file: /path/to/local/model.rknn
+      remote_dir: /userdata/nvme_ssd/push_test
+      remote_file: model.rknn
+    - local_file: /path/to/local/config.yaml
+      remote_dir: /userdata/nvme_ssd/push_test
+      remote_file: config.yaml
+  remote_exec:
+    enable: 1
+    script_path: /userdata/nvme_ssd/push_test/run_test.sh
+    params: ""
+    timeout: 300
+```
+
+### 板子测试配置示例
+
+```yaml
+board_test:
+  test_command: "./detector"
+  model_file: "model.rknn"
+  temp_path: "/userdata/nvme_ssd/push_test/temp"
+  target_path: "/userdata/nvme_ssd/detector"
+```
+
 ## 日志查看
 
-训练日志默认保存在`base.output_root`目录下，文件名格式为`train_${train.core_params.name}_${date}.out`。
+- **训练日志**：默认保存在`base.output_root`目录下，文件名格式为`train_${train.core_params.name}_${date}.out`
+- **SFTP推送日志**：默认保存在当前目录下，文件名`sfp_push.log`
+- **板子测试日志**：保存在远程板子的测试脚本同级目录，文件名`run_test.out`
 
-查看日志：
+查看训练日志：
 ```bash
 tail -f /data/results/train_xianguo-seg-train_20260109.out
+```
+
+查看SFTP推送日志：
+```bash
+tail -f sftp_push.log
 ```
 
 ## 结果输出
@@ -211,6 +286,7 @@ tail -f /data/results/train_xianguo-seg-train_20260109.out
 - **测试结果**：保存在`base.output_root/test_results`目录下
 - **评估指标**：保存在`base.output_root/metrics_${train.core_params.name}_${date}.xlsx`
 - **RKNN模型**：保存在`train.model_conversion.rknn_output_path`指定的目录下
+- **板子测试结果**：保存在远程板子的测试脚本同级目录
 
 ## 注意事项
 
@@ -218,7 +294,9 @@ tail -f /data/results/train_xianguo-seg-train_20260109.out
 2. 确保训练和测试脚本路径正确
 3. 确保测试数据集路径存在
 4. 模型转换需要依赖rknn_toolkit2等相关库
-5. 首次运行建议先检查配置文件的正确性
+5. SFTP推送需要确保网络连接正常和权限正确
+6. 板子测试脚本使用纯bash编写，无需Python依赖
+7. 首次运行建议先检查配置文件的正确性
 
 ## 扩展说明
 
@@ -226,9 +304,19 @@ tail -f /data/results/train_xianguo-seg-train_20260109.out
 
 - 可在`test/eval/run_eval.sh`中扩展评估指标计算逻辑
 - 可在`utils/`目录下添加新的工具脚本
+- 可在`src/`目录下添加新的远程执行脚本
 - 可在`config.yaml`中添加新的配置项
 
 ## 更新日志
+
+### v1.1.0 (2026-01-19)
+- 新增SFTP推送功能，支持多文件推送和远程脚本执行
+- 新增远程板子测试功能，支持纯bash YAML解析
+- 优化微信推送功能，新增SFTP推送和板子测试通知
+- 实现微信通知顺序优化：SFTP推送通知 → 板子测试通知
+- 新增日志重定向功能，支持将测试输出保存到文件
+- 实现远程脚本的备份/恢复机制
+- 支持多文件推送模式配置
 
 ### v1.0.1 (2026-01-15)
 - 完善目录结构，补充缺失的文件说明

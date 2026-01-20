@@ -168,7 +168,27 @@ main() {
         log_info "跳过模型转换任务（未开启）"
     fi
     
-    # 5. 权重监控脚本管理
+    # 5. SFTP推送功能
+    # 检查是否开启SFTP推送
+    SFTP_OPEN=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['sftp']['open'])" 2>/dev/null || echo 0)
+    
+    if [ "$SFTP_OPEN" -eq 1 ]; then
+        log_info "执行SFTP推送任务..."
+        
+        # 执行SFTP推送脚本
+        python3 "$CURRENT_DIR/utils/run_sftp_push.py" "$CONFIG_FILE"
+        
+        if [ $? -ne 0 ]; then
+            log_error "SFTP推送任务执行失败"
+            # SFTP推送失败不影响其他任务，继续执行
+        else
+            log_success "SFTP推送任务执行完成"
+        fi
+    else
+        log_info "跳过SFTP推送任务（未开启）"
+    fi
+    
+    # 6. 权重监控脚本管理
     # 注意：监控脚本将持续运行，直到训练完成或手动停止
     # 训练完成后，监控脚本会检测到train-finished.txt文件并自动退出
     if [ -f "$CURRENT_DIR/monitor.pid" ]; then
@@ -186,9 +206,16 @@ main() {
     log_success "所有任务执行完成！"
     
     # 输出日志查看提示
-    LOG_FILE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['log']['log_file'])" | sed 's/\${base.output_root}/\/data\/results/g')
-    log_info "训练日志：tail -f $LOG_FILE"
+    LOG_FILE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config.get('train', {}).get('log', {}).get('log_file', ''))" 2>/dev/null || echo "")
+    if [ -n "$LOG_FILE" ]; then
+        log_info "训练日志：tail -f $LOG_FILE"
+    fi
+    
     log_info "结果目录：$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base']['output_root'])")"
+    
+    # 输出SFTP推送日志提示
+    SFTP_LOG_FILE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config.get('logging', {}).get('log_file', 'sftp_push.log'))" 2>/dev/null || echo "sftp_push.log")
+    log_info "SFTP推送日志：tail -f $SFTP_LOG_FILE"
 }
 
 # 执行主函数

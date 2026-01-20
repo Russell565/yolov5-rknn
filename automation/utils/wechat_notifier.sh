@@ -456,3 +456,140 @@ send_error_notification() {
     # 发送通知
     send_wechat_notification "$abs_config_file" "error" "$title" "$content"
 }
+
+# 发送SFTP推送通知
+# 参数：
+# $1: 配置文件路径
+# $2: 推送状态（success/failed）
+# $3: 本地文件路径
+# $4: 远程文件路径
+send_sftp_notification() {
+    local config_file=$1
+    local status=$2
+    local local_file=$3
+    local remote_path=$4
+    
+    # 确保使用绝对路径
+    local abs_config_file=$(readlink -f "$config_file")
+    
+    # 从配置文件读取标题，默认值为"SFTP推送"
+    local title=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['wechat']['templates'].get('sftp_push', {}).get('title', 'SFTP推送'))")
+    
+    # 获取训练名称
+    local train_name=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['core_params']['name']" 2>/dev/null || echo "未知任务")
+    
+    # 检查是否为多文件推送模式
+    if [ "$local_file" = "multiple_files" ] || [ "$remote_path" = "multiple_remote_paths" ]; then
+        # 多文件推送模式
+        # 从配置文件中获取所有要推送的文件列表
+        local files_list=$(python3 -c "import yaml, json; config=yaml.safe_load(open('$abs_config_file')); print(json.dumps(config['sftp'].get('files', [])))")
+        
+        # 统计文件数量
+        local file_count=$(python3 -c "import json; files=json.loads('$files_list'); print(len(files))")
+        
+        # 构建文件列表内容
+        local file_details=""
+        
+        # 如果有文件，构建详细列表
+        if [ "$file_count" -gt 0 ]; then
+            file_details="\n\n**推送文件详情**"
+            
+            # 遍历每个文件，构建详情信息
+            local i=1
+            while [ $i -le $file_count ]; do
+                # 获取单个文件配置
+                local file_config=$(python3 -c "import json; files=json.loads('$files_list'); print(json.dumps(files[$i-1]))")
+                
+                # 提取文件信息
+                local file_local=$(python3 -c "import json; file=json.loads('$file_config'); print(file.get('local_file', ''))")
+                local file_remote_dir=$(python3 -c "import json; file=json.loads('$file_config'); print(file.get('remote_dir', ''))")
+                local file_remote_name=$(python3 -c "import json; file=json.loads('$file_config'); print(file.get('remote_file', ''))")
+                
+                # 如果未指定远程文件名，使用本地文件名
+                if [ -z "$file_remote_name" ] && [ -n "$file_local" ]; then
+                    file_remote_name=$(basename "$file_local")
+                fi
+                
+                # 构建完整远程路径
+                local file_remote_path="$file_remote_dir/$file_remote_name"
+                
+                # 添加到详情列表
+                file_details="$file_details\n$i. **本地文件**: $(basename "$file_local")"
+                file_details="$file_details\n   **远程路径**: $file_remote_path"
+                
+                i=$((i+1))
+            done
+        fi
+        
+        # 构建多文件推送消息内容
+        local content="""
+
+**SFTP推送信息**
+- 任务名称: $train_name
+- 推送状态: $status
+- 推送文件数量: $file_count
+- 推送时间: $(date '+%Y-%m-%d %H:%M:%S')$file_details
+    """
+    else
+        # 单文件推送模式（兼容旧版）
+        local content="""
+
+**SFTP推送信息**
+- 任务名称: $train_name
+- 推送状态: $status
+- 本地文件: $(basename "$local_file")
+- 远程路径: $remote_path
+- 推送时间: $(date '+%Y-%m-%d %H:%M:%S')
+    """
+    fi
+    
+    # 发送通知
+    send_wechat_notification "$abs_config_file" "sftp_push" "$title" "$content"
+}
+
+# 发送板子测试通知
+# 参数：
+# $1: 配置文件路径
+# $2: 测试状态（success/failed）
+# $3: 测试结果（可选）
+send_board_test_notification() {
+    local config_file=$1
+    local status=$2
+    local test_result=$3
+    
+    # 确保使用绝对路径
+    local abs_config_file=$(readlink -f "$config_file")
+    
+    # 从配置文件读取标题，默认值为"板子测试"
+    local title=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['wechat']['templates'].get('board_test', {}).get('title', '板子测试'))")
+    
+    # 获取训练名称
+    local train_name=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['core_params']['name']" 2>/dev/null || echo "未知任务")
+    
+    # 获取板子测试配置
+    local temp_path=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['board_test']['temp_path'])")
+    local target_path=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['board_test']['target_path'])")
+    local model_file=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['board_test']['model_file'])")
+    
+    # 获取测试命令
+    local test_command=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['board_test']['test_command'])")
+    
+    # 构建消息内容 - 只包含详细内容，以空行开头
+    local content="""
+
+**板子测试信息**
+- 任务名称: $train_name
+- 测试状态: $status
+- 模型文件: $model_file
+- 测试命令: $test_command
+- 测试时间: $(date '+%Y-%m-%d %H:%M:%S')
+"""
+    
+    # 如果有测试结果，添加到内容中
+    if [ -n "$test_result" ]; then
+        content="$content\n**测试结果**\n$test_result"
+    fi
+    
+    # 发送通知
+    send_wechat_notification "$abs_config_file" "board_test" "$title" "$content"
+}
