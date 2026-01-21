@@ -270,10 +270,39 @@ EOF
     
     # 执行训练
     eval "$TRAIN_CMD"
+    TRAIN_PID=$!
     
     if [ $? -eq 0 ]; then
-        log_success "训练进程已启动"
+        log_success "训练进程已启动，PID: $TRAIN_PID"
         log_info "查看训练日志: tail -f $LOG_FILE"
+        
+        # 等待一段时间，检查训练是否真正开始
+        sleep 10
+        
+        # 检查训练日志，判断训练是否正常开始
+        if [ -f "$LOG_FILE" ]; then
+            # 检查日志中是否有真正的错误信息，避免误判正常训练指标（如error_bbox、error_mask）
+            # 只检测严重错误，如RuntimeError、ImportError、AssertionError等
+            if grep -q "RuntimeError" "$LOG_FILE" || grep -q "ImportError" "$LOG_FILE" || grep -q "AssertionError" "$LOG_FILE" || \
+               grep -q "AttributeError" "$LOG_FILE" || grep -q "TypeError" "$LOG_FILE" || grep -q "ValueError" "$LOG_FILE" || \
+               grep -q "OSError" "$LOG_FILE" || grep -q "KeyError" "$LOG_FILE" || grep -q "MemoryError" "$LOG_FILE" || \
+               grep -q "CUDA error" "$LOG_FILE" || grep -q "CUDA out of memory" "$LOG_FILE"; then
+                log_error "训练进程已启动，但日志中检测到严重错误"
+                log_error "查看训练日志获取详细信息: tail -f $LOG_FILE"
+                exit 1
+            fi
+            
+            # 检查日志中是否有训练开始的标志
+            if grep -q "Epoch" "$LOG_FILE" || grep -q "Training" "$LOG_FILE" || grep -q "train" "$LOG_FILE"; then
+                log_success "训练已正常开始"
+            else
+                log_warning "训练进程已启动，但日志中未检测到训练开始的标志，可能训练过程存在问题"
+                log_info "请查看训练日志确认: tail -f $LOG_FILE"
+            fi
+        else
+            log_warning "训练日志文件未创建，可能训练进程存在问题"
+            log_info "请查看训练进程状态: ps -p $TRAIN_PID"
+        fi
     else
         log_error "训练命令执行失败"
         exit 1

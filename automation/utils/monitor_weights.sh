@@ -310,6 +310,17 @@ main() {
             log_info "开始执行模型转换..."
             bash "$CURRENT_DIR/run_model_conversion.sh" "$CONFIG_FILE"
             
+            # 模型转换完成后，检查是否需要执行SFTP推送
+            log_info "检查是否需要执行SFTP推送..."
+            SFTP_OPEN=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config.get('sftp', {}).get('open', 0))")
+            if [ "$SFTP_OPEN" -eq 1 ]; then
+                log_info "开始执行SFTP推送..."
+                python3 "$CURRENT_DIR/run_sftp_push.py" "$CONFIG_FILE"
+                log_info "SFTP推送执行完成"
+            else
+                log_info "跳过SFTP推送（未开启）"
+            fi
+            
             log_info "训练结束，退出监控"
             echo "$(date '+%Y-%m-%d %H:%M:%S') - TRAIN FINISHED, EXITING" >> "$MONITOR_LOG"
             exit 0

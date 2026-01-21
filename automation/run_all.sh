@@ -144,7 +144,7 @@ main() {
     fi
     
     # 4. 执行模型转换（如果配置了）
-    CONVERSION_ENABLE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['model_conversion']['enable'])" 2>/dev/null || echo 0)
+    CONVERSION_ENABLE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['model_conversion']['enable'])") 2>/dev/null || echo 0
     
     if [ "$CONVERSION_ENABLE" -eq 1 ]; then
         CONVERT_AFTER_TRAIN=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['model_conversion']['convert_after_train'])")
@@ -169,24 +169,9 @@ main() {
     fi
     
     # 5. SFTP推送功能
-    # 检查是否开启SFTP推送
-    SFTP_OPEN=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['sftp']['open'])" 2>/dev/null || echo 0)
-    
-    if [ "$SFTP_OPEN" -eq 1 ]; then
-        log_info "执行SFTP推送任务..."
-        
-        # 执行SFTP推送脚本
-        python3 "$CURRENT_DIR/utils/run_sftp_push.py" "$CONFIG_FILE"
-        
-        if [ $? -ne 0 ]; then
-            log_error "SFTP推送任务执行失败"
-            # SFTP推送失败不影响其他任务，继续执行
-        else
-            log_success "SFTP推送任务执行完成"
-        fi
-    else
-        log_info "跳过SFTP推送任务（未开启）"
-    fi
+    # 注意：SFTP推送已移至monitor_weights.sh脚本中，在模型转换完成后执行
+    # 这里不再直接执行SFTP推送，确保流程按照训练→测试→转换→推送上板测试的顺序执行
+    log_info "SFTP推送将在模型转换完成后由监控脚本自动执行"
     
     # 6. 权重监控脚本管理
     # 注意：监控脚本将持续运行，直到训练完成或手动停止
