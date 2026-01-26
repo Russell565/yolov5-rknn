@@ -15,11 +15,30 @@ def crop_mask(masks, boxes):
     """
 
     n, h, w = masks.shape
+    
+    # 定义边界框扩展像素
+    EXPAND_PX = 5
+    
+    # 原始代码：获取边界框坐标，保持原有形状处理逻辑
     x1, y1, x2, y2 = torch.chunk(boxes[:, :, None], 4, 1)  # x1 shape(1,1,n)
+    
+    # 扩展边界框范围，避免裁切掉目标的边界
+    x1_expanded = x1 - EXPAND_PX
+    y1_expanded = y1 - EXPAND_PX
+    x2_expanded = x2 + EXPAND_PX
+    y2_expanded = y2 + EXPAND_PX
+    
+    # 确保坐标在有效范围内 [0, w] 和 [0, h]
+    x1_expanded = torch.clamp(x1_expanded, 0, w)
+    y1_expanded = torch.clamp(y1_expanded, 0, h)
+    x2_expanded = torch.clamp(x2_expanded, 0, w)
+    y2_expanded = torch.clamp(y2_expanded, 0, h)
+    
     r = torch.arange(w, device=masks.device, dtype=x1.dtype)[None, None, :]  # rows shape(1,w,1)
     c = torch.arange(h, device=masks.device, dtype=x1.dtype)[None, :, None]  # cols shape(h,1,1)
-
-    return masks * ((r >= x1) * (r < x2) * (c >= y1) * (c < y2))
+    
+    # 使用扩展后的边界框进行裁剪
+    return masks * ((r >= x1_expanded) * (r < x2_expanded) * (c >= y1_expanded) * (c < y2_expanded))
 
 
 def process_mask_upsample(protos, masks_in, bboxes, shape):
@@ -88,7 +107,8 @@ def scale_image(im1_shape, masks, im0_shape, ratio_pad=None):
     # masks = masks.permute(2, 0, 1).contiguous()
     # masks = F.interpolate(masks[None], im0_shape[:2], mode='bilinear', align_corners=False)[0]
     # masks = masks.permute(1, 2, 0).contiguous()
-    masks = cv2.resize(masks, (im0_shape[1], im0_shape[0]))
+    # masks = cv2.resize(masks, (im0_shape[1], im0_shape[0]))
+    masks = cv2.resize(masks, (im0_shape[1], im0_shape[0]), interpolation=cv2.INTER_LINEAR)
 
     if len(masks.shape) == 2:
         masks = masks[:, :, None]
