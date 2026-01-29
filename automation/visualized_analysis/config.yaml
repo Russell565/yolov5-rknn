@@ -1,0 +1,88 @@
+# 可视化分析配置文件
+
+# 基础配置
+base:
+  conda_env: rknn          # Python环境名称
+  output_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/predict-seg/visualized_analysis  # 输出根目录
+
+# 评估配置
+eval:
+  open: 1                   # 是否开启评估任务
+  mode: seg                 # det或seg
+  iou_threshold: 0.5        # IOU阈值
+  pixel_filter:
+    enable: 1               # 是否启用像素过滤
+    left: 100               # 左侧过滤像素数
+    right: 50               # 右侧过滤像素数
+    top: 50                 # 顶部过滤像素数
+    bottom: 50              # 底部过滤像素数
+
+# 可视化配置
+visualization:
+  enable: 1                 # 是否启用可视化
+  # - 优先级 ： image_size > image_width / image_height > 原图大小
+  # - 处理逻辑 ：
+  # 1. 如果 image_size > 0，使用指定的正方形大小
+  # 2. 否则，如果 image_width > 0 或 image_height > 0，使用指定的宽高
+  # 3. 否则，使用原图大小
+  image_size: 0             # 图片大小（像素），0表示使用原图大小
+  image_width: 0             # 图片宽度（像素），0表示使用原图宽度
+  image_height: 0            # 图片高度（像素），0表示使用原图高度
+  stitch_direction: horizontal  # 拼接方向：horizontal（水平）或 vertical（垂直）
+  stitch_ratio: 0.5         # 拼接比例（0-1）
+  label_visualization: 1     # 是否在图片上标注检测框或分割掩码
+  save_images: 1             # 是否保存可视化结果为图片文件
+
+# 报告配置
+report:
+  enable: 1                 # 是否启用报告生成
+  excel_report: 1            # 是否生成Excel报告
+  combined_report: 1         # 是否生成总表
+  zip_results: 0             # 是否打包结果
+
+# 数据集配置
+datasets:
+  - name: xianguo_final      # 数据集名称
+    image_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/xianguo_final/images  # 原始图片目录
+    gt_label_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/xianguo_final/labels_seg  # 真实标签目录
+    pred_label_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/predict-seg/xianguo/labels
+    has_labels: 1            # 是否有真实标签
+  
+  - name: quexian_final      # 数据集名称
+    image_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/quexian_final/images  # 原始图片目录
+    gt_label_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/quexian_final/labels_seg  # 真实标签目录
+    pred_label_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/predict-seg/quexian/labels
+    has_labels: 1            # 是否有真实标签
+  
+  - name: yixing_final       # 数据集名称
+    image_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/yixing_final/images  # 原始图片目录
+    gt_label_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/yixing_final/labels_seg  # 真实标签目录
+    pred_label_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/predict-seg/yixing/labels
+    has_labels: 1            # 是否有真实标签
+  
+  - name: qiguo_final        # 数据集名称
+    image_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/qiguo_final/images  # 原始图片目录
+    gt_label_dir: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/qiguo_final/labels_seg  # 真实标签目录
+    pred_label_dir:  /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/predict-seg/qiguo/labels
+    has_labels: 1            # 是否有真实标签
+
+# 类别配置
+class_config:
+  type: seg                 # 类别类型
+  classes:                  # 类别对照表
+    0: 
+      id: 0
+      name: xianguo
+      cn_name: 鲜果
+    1:
+      id: 1
+      name: quexian
+      cn_name: 缺陷
+    2:
+      id: 2
+      name: yixing
+      cn_name: 异形
+    3:
+      id: 3
+      name: qiguo
+      cn_name: 弃果
