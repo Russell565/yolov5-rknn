@@ -4,11 +4,11 @@
 base:
   conda_env: rknn          # 基础conda环境（train/test未指定时使用）
   working_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self  # 工作目录（绝对路径）
-  output_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0119  # 所有结果的统一存储根目录
+  output_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129  # 所有结果的统一存储根目录
 
 # 训练配置
 train:
-  open: 0                   # 是否开启训练任务
+  open: 1                   # 是否开启训练任务
   conda_env: rknn     # 训练专用conda环境（可选）
   det_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train.py  # 检测训练脚本
   seg_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/segment/train.py  # 分割训练脚本
@@ -32,7 +32,7 @@ train:
   core_params:
     only-corn: 0            # 项目特定参数
     project: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg  # 训练结果保存目录
-    name: xianguo-seg-cls4-0119  # 本次训练模型名称
+    name: xianguo-seg-cls4-0129  # 本次训练模型名称
     hyp: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/hyps/hyp.xianguo_grading_det.yaml  # 超参数文件路径
     data: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/spb/xianguo/xianguo-segment-cls-20251215.yaml  # 数据集配置文件路径
     epochs: 900             # 训练轮次
@@ -55,12 +55,12 @@ train:
   # 日志配置
   log:
     redirect: 1             # 是否重定向日志
-    log_file: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0119/train_xianguo_seg_cls_20260119_test.out  # 日志文件路径
+    log_file: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/train_xianguo_seg_cls_20260129_test.out  # 日志文件路径
   
   # 环境记录配置
   env_record:
     enable: 1               # 是否记录环境信息
-    save_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0119/env_info  # 环境信息保存路径
+    save_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/env_info  # 环境信息保存路径
     save_requirements: 1    # 是否保存依赖列表
     save_config: 1          # 是否备份当前配置文件
     save_system_info: 1     # 是否保存系统信息
@@ -71,16 +71,16 @@ train:
     script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/output_rknn.sh  # 转换脚本路径
     convert_after_train: 1  # 1：训练结束进行转换 0：不训练亦可进行转换(一般用于直接测试)
     convert_weights:        # 需要转换的权重文件
-      - /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0119/weights/best.pt
-    # rknn_output_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0119/weights  # RKNN模型输出路径
-    custom_name: xianguo_cls_0119  # 自定义RKNN文件名（可选），默认使用权重文件名
+      - /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0129/weights/best.pt
+    # rknn_output_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0129/weights  # RKNN模型输出路径
+    custom_name: xianguo_cls_0129  # 自定义RKNN文件名（可选），默认使用权重文件名
     params:                 # 模型转换额外参数
       task_type: seg        # 任务类型（det或seg）
       calib_dir: xianguo    # 校准图像目录名
 
 # 测试配置
 test:
-  open: 0                   # 是否开启测试任务
+  open: 1                   # 是否开启测试任务
   conda_env: rknn    # 测试专用conda环境（可选）
   det_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/detect.py  # 检测测试脚本
   seg_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/segment/predict.py  # 分割测试脚本
@@ -91,8 +91,8 @@ test:
     iou_threshold: 0.5      # IOU阈值
     conf_thres: 0.25        # 置信度阈值
     img_size: 640           # 输入图像大小
-    project: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0119/test_results  # 测试结果保存目录
-    name: xianguo-seg-cls4-0119  # 测试结果子目录名
+    project: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/test_results  # 测试结果保存目录
+    name: xianguo-seg-cls4-0129  # 测试结果子目录名
     save_txt: true          # 是否保存检测结果为TXT
     # save_conf: true         # 是否保存置信度
   
@@ -112,7 +112,7 @@ test:
   direct_test:
     open: 0                 # 是否开启直接测试模式（不训练，只测试）
     weights: [
-      /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0119/weights/best.pt
+      /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0129/weights/best.pt
     ]             # 直接测试的权重文件列表，支持多个权重文件
   
   # 权重管理配置
@@ -153,8 +153,14 @@ test:
   # 结果保存配置
   result:
     format: xlsx            # 结果格式
-    file_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0119/metrics_xianguo-seg-cls4-0119_20260119.xlsx  # 结果文件路径
-    output_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0119/test_results  # 测试输出目录
+    file_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/metrics_xianguo-seg-cls4-0129_20260129.xlsx  # 结果文件路径
+    output_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/test_results  # 测试输出目录
+  
+  # 标签文件保存配置
+  label_save:
+    enable: 1               # 是否启用保存标签文件
+    save_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/labels  # 标签文件保存根目录
+    format: epoch_based      # 保存格式，epoch_based表示按epoch分组
 
 # 类别配置
 class_config:
@@ -179,7 +185,7 @@ class_config:
 
 # SFTP推送配置
 sftp:
-  open: 1                   # 是否开启SFTP推送功能
+  open: 0                   # 是否开启SFTP推送功能
   
   # 远程设备信息
   host: "10.17.3.150"  # 板子的 IP 地址
@@ -190,17 +196,17 @@ sftp:
   
   # 多文件推送配置
   files:
-    - local_file: "/home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0119/weights/xianguo_cls_0119_encrypt.rknn"  # 本地模型文件路径
-      remote_dir: "/userdata/nvme_ssd/push_test/0119"  # 远程模型目录
-      remote_file: "xianguo_cls_0119_test_encrypt.rknn"  # 远程模型文件名（可选，默认与本地文件名相同）
+    - local_file: "/home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0129/weights/xianguo_cls_0129_encrypt.rknn"  # 本地模型文件路径
+      remote_dir: "/userdata/nvme_ssd/push_test/0129"  # 远程模型目录
+      remote_file: "xianguo_cls_0129_test_encrypt.rknn"  # 远程模型文件名（可选，默认与本地文件名相同）
     - local_file: "/home/user/cv_project/corn-detection/yolov5-rknn-self/automation/src/run_test.sh"
-      remote_dir: "/userdata/nvme_ssd/push_test/0119"
+      remote_dir: "/userdata/nvme_ssd/push_test/0129"
       remote_file: "run_test.sh"
     - local_file: "/home/user/cv_project/corn-detection/yolov5-rknn-self/automation/src/corn-grading-det-daemon.conf"
-      remote_dir: "/userdata/nvme_ssd/push_test/0119"
+      remote_dir: "/userdata/nvme_ssd/push_test/0129"
       remote_file: "corn-grading-det-daemon.conf"
     - local_file: "/home/user/cv_project/corn-detection/yolov5-rknn-self/automation/config.yaml"
-      remote_dir: "/userdata/nvme_ssd/push_test/0119"
+      remote_dir: "/userdata/nvme_ssd/push_test/0129"
       remote_file: "config.yaml"
   
   # 超时配置
@@ -209,7 +215,7 @@ sftp:
   # 远程执行脚本配置
   remote_exec:
     enable: 1             # 是否开启远程执行功能
-    script_path: /userdata/nvme_ssd/push_test/0119/run_test.sh  # 远程脚本路径
+    script_path: /userdata/nvme_ssd/push_test/0129/run_test.sh  # 远程脚本路径
     params: ""  # 脚本参数，直接传参格式
     timeout: 300          # 远程执行超时时间（秒）
 
@@ -220,12 +226,12 @@ logging:
 
 # 板子测试配置
 board_test:
-  temp_path: "/userdata/nvme_ssd/push_test/0119"  # 板子上的临时路径A
+  temp_path: "/userdata/nvme_ssd/push_test/0129"  # 板子上的临时路径A
   target_path: "/speciband"  # 板子上的原程序路径B
   daemon_name: "corn-grading-det-daemon"  # 守护程序名称
-  test_command: "/speciband/corn-grading-det-daemon --mode test --image /userdata/nvme_ssd/push_test/0119/20251218_test --cycle 0 --interval 1000"  # 测试命令
+  test_command: "/speciband/corn-grading-det-daemon --mode test --image /userdata/nvme_ssd/push_test/0129/20251218_test --cycle 0 --interval 1000"  # 测试命令
   config_file: "corn-grading-det-daemon.conf"  # 配置文件名
-  model_file: "xianguo_cls_0119_test_encrypt.rknn"  # 模型文件名
+  model_file: "xianguo_cls_0129_test_encrypt.rknn"  # 模型文件名
   backup_suffix: "_test_bk"  # 备份文件后缀
 
 # 微信推送配置

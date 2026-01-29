@@ -245,7 +245,7 @@ for dataset in datasets:
     
     # 分割模型需要特殊处理，确保--project和--name参数正确
     # 同时确保--save-txt和--save-conf参数被正确传递
-    test_cmd = "python {0} --source {1} --weights {2} --project {3} --name {4} --save-txt --save-conf {5}".format(
+    test_cmd = "python {0} --source {1} --weights {2} --project {3} --name {4} --save-txt --save-conf --exist-ok {5}".format(
         TEST_SCRIPT, full_img_path, WEIGHT_PATH, WEIGHT_OUTPUT_DIR, dataset_name, filtered_args_str
     )
     # 确保--save-txt参数只出现一次，正确处理带值的参数
@@ -314,8 +314,12 @@ for dataset in datasets:
         # 打印生成的目录结构，帮助调试
         print("[INFO] 测试结果目录结构:")
         subprocess.run(f"find '{WEIGHT_OUTPUT_DIR}' -type d | sort", shell=True, text=True)
-        print("[INFO] 生成的文件:")
+        print("[INFO] 生成的所有文件:")
+        subprocess.run(f"find '{WEIGHT_OUTPUT_DIR}' -type f | sort", shell=True, text=True)
+        print("[INFO] 生成的txt文件:")
         subprocess.run(f"find '{WEIGHT_OUTPUT_DIR}' -name '*.txt' | head -20", shell=True, text=True)
+        print("[INFO] 检查具体数据集目录:")
+        subprocess.run(f"ls -la '{dataset_output_dir}'", shell=True, text=True)
         
         # 9. 压缩结果（如果启用）
         if ZIP_ENABLE == 1:
@@ -834,7 +838,107 @@ except Exception as e:
     import traceback
     traceback.print_exc()
 
-# 6. 清理推理结果，只保留xlsx文件
+# 6. 保存标签文件（如果启用）
+print("- 检查是否需要保存标签文件...")
+
+# 读取标签保存配置
+try:
+    label_save_enable = config['test']['label_save']['enable']
+    label_save_root = config['test']['label_save']['save_root']
+    label_save_format = config['test']['label_save']['format']
+    
+    if label_save_enable == 1:
+        print(f"- 启用标签文件保存，保存根目录: {label_save_root}")
+        
+        # 创建保存根目录
+        os.makedirs(label_save_root, exist_ok=True)
+        
+        # 遍历每个权重文件
+        for weight_path in WEIGHTS_TO_TEST:
+            weight_name = os.path.basename(weight_path).replace('.pt', '')
+            
+            # 解析Epoch信息
+            if weight_name.startswith('epoch'):
+                epoch = weight_name.replace('epoch', '')
+            elif weight_name == 'best':
+                epoch = 'best'
+            elif weight_name == 'last':
+                epoch = 'last'
+            else:
+                epoch = weight_name
+            
+            # 获取权重输出目录
+            weight_output_dir = os.path.join(RESULT_OUTPUT_DIR, weight_name)
+            
+            if os.path.exists(weight_output_dir):
+                # 遍历所有数据集
+                datasets = DATASET_CONFIG['datasets']
+                for dataset in datasets:
+                    dataset_name = dataset['name']
+                    
+                    # 构建标签保存路径
+                    if label_save_format == 'epoch_based':
+                        # 按照 epoch0, epoch3, epoch6 格式
+                        label_save_dir = os.path.join(label_save_root, f"epoch{epoch}", dataset_name)
+                    else:
+                        # 默认格式
+                        label_save_dir = os.path.join(label_save_root, weight_name, dataset_name)
+                    
+                    # 创建保存目录
+                    os.makedirs(label_save_dir, exist_ok=True)
+                    
+                    # 查找该数据集的标签文件
+                    dataset_output_dir = os.path.join(weight_output_dir, dataset_name)
+                    labels_dir = os.path.join(dataset_output_dir, 'labels')
+                    
+                    if os.path.exists(labels_dir):
+                        # 复制所有标签文件到保存目录
+                        for file in os.listdir(labels_dir):
+                            if file.endswith('.txt'):
+                                src_path = os.path.join(labels_dir, file)
+                                dst_path = os.path.join(label_save_dir, file)
+                                try:
+                                    shutil.copy2(src_path, dst_path)
+                                    print(f"  保存标签文件: {dst_path}")
+                                except Exception as e:
+                                    print(f"  保存标签文件失败: {src_path}, 错误: {e}")
+                    else:
+                        # 标签目录不存在，尝试直接在数据集目录下查找txt文件
+                        print(f"  标签目录不存在: {labels_dir}")
+                        print(f"  尝试在数据集目录下查找txt文件: {dataset_output_dir}")
+                        if os.path.exists(dataset_output_dir):
+                            for file in os.listdir(dataset_output_dir):
+                                if file.endswith('.txt'):
+                                    src_path = os.path.join(dataset_output_dir, file)
+                                    dst_path = os.path.join(label_save_dir, file)
+                                    try:
+                                        shutil.copy2(src_path, dst_path)
+                                        print(f"  保存标签文件: {dst_path}")
+                                    except Exception as e:
+                                        print(f"  保存标签文件失败: {src_path}, 错误: {e}")
+                        
+                        # 尝试查找其他可能的标签文件位置
+                        print(f"  尝试查找其他可能的标签文件位置...")
+                        all_txt_files = []
+                        for root, dirs, files in os.walk(weight_output_dir):
+                            for file in files:
+                                if file.endswith('.txt'):
+                                    all_txt_files.append(os.path.join(root, file))
+                        
+                        if all_txt_files:
+                            print(f"  找到 {len(all_txt_files)} 个txt文件:")
+                            for file_path in all_txt_files[:5]:  # 只显示前5个
+                                print(f"    - {file_path}")
+                        else:
+                            print(f"  未找到任何txt文件")
+        
+        print("- 标签文件保存完成")
+    else:
+        print("- 标签文件保存未启用")
+except KeyError:
+    print("- 未找到标签保存配置，跳过保存")
+
+# 7. 清理推理结果，只保留xlsx文件
 print("- 清理推理结果...")
 
 # 只保留最终的结果文件，删除其他所有文件
