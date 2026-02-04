@@ -170,7 +170,9 @@ class InfiniteDataLoader(dataloader.DataLoader):
         return len(self.batch_sampler.sampler)
 
     def __iter__(self):
-        # Fix for DDP training with drop_last=True: remove length restriction, let _RepeatSampler handle infinite iteration
+        # Yield batches infinitely while reusing workers.
+        # Note: self.batch_sampler is wrapped by _RepeatSampler, so next(self.iterator) is always available.
+        # Training loop will break when i >= nb
         while True:
             yield next(self.iterator)
 
