@@ -39,6 +39,15 @@ fi
 # 获取当前目录
 CURRENT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# 清理旧进程和临时文件
+log_info "清理旧进程和临时文件..."
+bash "$CURRENT_DIR/kill_all.sh"
+if [ $? -eq 0 ]; then
+    log_success "环境清理完成"
+else
+    log_warning "环境清理时出现警告，但继续执行"
+fi
+
 # 加载微信推送函数
 source "$CURRENT_DIR/utils/wechat_notifier.sh"
 
