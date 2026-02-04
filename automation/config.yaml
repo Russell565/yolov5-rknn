@@ -4,7 +4,7 @@
 base:
   conda_env: rknn          # 基础conda环境（train/test未指定时使用）
   working_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self  # 工作目录（绝对路径）
-  output_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129  # 所有结果的统一存储根目录
+  output_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260204-xian-huanuo-seg   # 所有结果的统一存储根目录
 
 # 训练配置
 train:
@@ -26,20 +26,20 @@ train:
   # 恢复训练配置
   resume:
     open: 0                 # 是否开启恢复训练
-    model_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20251220鲜果分类分割模型/weights/best.pt  # 恢复训练权重路径
+    model_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20260204鲜花糯玉米缺陷分割模型test/weights/best.pt  # 恢复训练权重路径
   
   # 核心训练参数
   core_params:
-    only-corn: 0            # 项目特定参数
+    object-seg: 0            # 项目特定参数
     project: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg  # 训练结果保存目录
-    name: xianguo-seg-cls4-0129  # 本次训练模型名称
-    hyp: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/hyps/hyp.xianguo_grading_det.yaml  # 超参数文件路径
-    data: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/spb/xianguo/xianguo-segment-cls-20251215.yaml  # 数据集配置文件路径
+    name: 20260204鲜花糯玉米缺陷分割模型test  # 本次训练模型名称
+    hyp: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/hyps/hyp.corn_grading_det.yaml  # 超参数文件路径
+    data: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/spb/grading/caise/caise_corn_grading-xian-seg-20260203.yaml  # 数据集配置文件路径
     epochs: 900             # 训练轮次
-    patience: 1           # 早停耐心值
+    patience: 50           # 早停耐心值
     batch_size: 64          # 批量大小
     workers: 24             # 数据加载进程数
-    save_period: 3          # 权重保存间隔
+    save_period: 100         # 权重保存间隔
     # img_size: 640           # 输入图像大小
     # seed: 42                # 随机种子
   
@@ -55,28 +55,28 @@ train:
   # 日志配置
   log:
     redirect: 1             # 是否重定向日志
-    log_file: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/train_xianguo_seg_cls_20260129_test.out  # 日志文件路径
+    log_file: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260204-xian-huanuo-seg/20260204-xian-huanuo-seg.out   # 日志文件路径
   
   # 环境记录配置
   env_record:
     enable: 1               # 是否记录环境信息
-    save_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/env_info  # 环境信息保存路径
+    save_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260204-xian-huanuo-seg/env_info  # 环境信息保存路径
     save_requirements: 1    # 是否保存依赖列表
     save_config: 1          # 是否备份当前配置文件
     save_system_info: 1     # 是否保存系统信息
   
   # 模型转换配置
   model_conversion:
-    enable: 0               # 是否启用模型转换
+    enable: 1              # 是否启用模型转换
     script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/output_rknn.sh  # 转换脚本路径
     convert_after_train: 1  # 1：训练结束进行转换 0：不训练亦可进行转换(一般用于直接测试)
     convert_weights:        # 需要转换的权重文件
-      - /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0129/weights/best.pt
-    # rknn_output_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/xianguo-seg-cls4-0129/weights  # RKNN模型输出路径
-    custom_name: xianguo_cls_0129  # 自定义RKNN文件名（可选），默认使用权重文件名
+      - /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20260204鲜花糯玉米缺陷分割模型test/weights/best.pt
+    # rknn_output_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20260129鲜黄玉米缺陷分割模型/weights  # RKNN模型输出路径
+    custom_name: 20260204_huanuo_xian_corn_seg  # 自定义RKNN文件名（可选），默认使用权重文件名
     params:                 # 模型转换额外参数
       task_type: seg        # 任务类型（det或seg）
-      calib_dir: xianguo    # 校准图像目录名
+      calib_dir: corn_huanuo    # 校准图像目录名
 
 # 测试配置
 test:
@@ -91,8 +91,8 @@ test:
     iou_threshold: 0.5      # IOU阈值
     conf_thres: 0.25        # 置信度阈值
     img_size: 640           # 输入图像大小
-    project: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/test_results  # 测试结果保存目录
-    name: xianguo-seg-cls4-0129  # 测试结果子目录名
+    project: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260204-xian-huanuo-seg/test_results  # 测试结果保存目录
+    name: 20260204-xian-huanuo-seg   # 测试结果子目录名
     save_txt: true          # 是否保存检测结果为TXT
     # save_conf: true         # 是否保存置信度
   
@@ -124,27 +124,19 @@ test:
   dataset_config:
     open: 1                 # 是否启用测试数据集配置
     datasets:               # 测试数据集列表
-      - name: xianguo_final  # 数据集名称
-        img_path: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/xianguo_final  # 父目录
+      - name: 20251218_huanuo_corn_det_part_part11  # 数据集名称
+        img_path: /data/test_data/corn/test_dataset/huanuo/xian-huanuo-seg/20251218_huanuo_corn_det_part_part11  # 父目录
         img_subdir: images   # 图片子目录名
         label_subdir: labels_seg  # 标签子目录名
-      - name: quexian_final
-        img_path: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/quexian_final
-        img_subdir: images
-        label_subdir: labels_seg
-      - name: yixing_final
-        img_path: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/yixing_final
-        img_subdir: images
-        label_subdir: labels_seg
-      - name: qiguo_final
-        img_path: /data/train_data/dataset/xianguo_project/train/xianguo_cls4_data/new_test_data/qiguo_final
+      - name: 20260104_bai_corn_grading_det_part12
+        img_path: /data/test_data/corn/test_dataset/huanuo/xian-huanuo-seg/20251218_huanuo_corn_det_part_part12
         img_subdir: images
         label_subdir: labels_seg
     zip: 0                  # 测试结果是否压缩（1-压缩，0-不压缩）
     
     # 像素过滤配置
     pixel_filter:
-      enable: 1             # 0-禁用，1-启用
+      enable: 0            # 0-禁用，1-启用
       left: 100             # 左侧过滤像素数
       right: 50             # 右侧过滤像素数
       top: 50               # 顶部过滤像素数
@@ -153,13 +145,13 @@ test:
   # 结果保存配置
   result:
     format: xlsx            # 结果格式
-    file_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/metrics_xianguo-seg-cls4-0129_20260129.xlsx  # 结果文件路径
-    output_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/test_results  # 测试输出目录
-  
+    file_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260204-xian-huanuo-seg/metrics_20260204-xian-huanuo-seg_20260204.xlsx  # 结果文件路径
+    output_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260204-xian-huanuo-seg/test_results  # 测试输出目录
+
   # 标签文件保存配置
   label_save:
     enable: 1               # 是否启用保存标签文件
-    save_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/task0129/labels  # 标签文件保存根目录
+    save_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260204-xian-huanuo-seg/labels  # 标签文件保存根目录
     format: epoch_based      # 保存格式，epoch_based表示按epoch分组
 
 # 类别配置
@@ -168,24 +160,41 @@ class_config:
   classes:                  # 类别对照表
     0: 
       id: 0
-      name: xianguo
-      cn_name: 鲜果
+      name: queli
+      cn_name: 缺粒
     1:
       id: 1
-      name: quexian
-      cn_name: 缺陷果
+      name: huaili
+      cn_name: 坏粒
     2:
       id: 2
-      name: yixing
-      cn_name: 异形果
+      name: bieli
+      cn_name: 瘪粒
     3:
       id: 3
-      name: qiguo
-      cn_name: 弃果
+      name: hua
+      cn_name: 花粒
+    4:
+      id: 4
+      name: meichong
+      cn_name: 霉虫   
+    5:
+      id: 5
+      name: duanlie
+      cn_name: 断裂
+    6:
+      id: 6     
+      name: jiya
+      cn_name: 挤压
+    7:
+      id: 7
+      name: ranse
+      cn_name: 染色
+
 
 # SFTP推送配置
 sftp:
-  open: 0                   # 是否开启SFTP推送功能
+  open: 0                  # 是否开启SFTP推送功能
   
   # 远程设备信息
   host: "10.17.3.150"  # 板子的 IP 地址
@@ -236,7 +245,7 @@ board_test:
 
 # 微信推送配置
 wechat:
-  open: 0                   # 是否开启微信推送
+  open: 1                  # 是否开启微信推送
   
   # 基础配置（与 send_message 方法参数对应）
   base:
@@ -256,21 +265,21 @@ wechat:
     test_result: 1           # 测试结果
     model_conversion: 1      # 模型转换
     error: 1                 # 错误信息
-    sftp_push: 1             # SFTP推送
-    board_test: 1            # 板子测试
+    sftp_push: 0             # SFTP推送
+    board_test: 0            # 板子测试
   
   # 消息模板配置
   templates:
     train_start:             # 训练开始模板
-      title: "训练任务开始"
+      title: "鲜花糯玉米缺陷分割训练任务开始"
     train_end:               # 训练结束模板
-      title: "训练任务结束"
+      title: "鲜花糯玉米缺陷分割训练任务结束"
     test_result:             # 测试结果模板
-      title: "测试结果"
+      title: "鲜花糯玉米缺陷分割测试结果"
     model_conversion:        # 模型转换模板
-      title: "模型转换"
+      title: "鲜花糯玉米缺陷分割模型转换"
     error:                   # 错误信息模板
-      title: "任务错误"
+      title: "鲜花糯玉米缺陷分割任务错误"
     sftp_push:               # SFTP推送模板
       title: "SFTP推送"
     board_test:              # 板子测试模板

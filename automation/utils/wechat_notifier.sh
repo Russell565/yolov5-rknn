@@ -157,7 +157,7 @@ send_train_start_notification() {
     local resume_model_path=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['resume']['model_path'])")
     
     # 获取核心训练参数
-    local only_corn=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['core_params']['only-corn'])")
+    local object_seg=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['core_params']['object-seg'])")
     local project=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['core_params']['project'])")
     local hyp=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['core_params']['hyp'])")
     local data=$(python3 -c "import yaml; config=yaml.safe_load(open('$abs_config_file')); print(config['train']['core_params']['data'])")
@@ -199,7 +199,7 @@ send_train_start_notification() {
 - 恢复模型路径: $resume_model_path
 
 **项目特定参数**
-- Only Corn: $only_corn
+- Object Seg: $object_seg
     """
     
     # 发送通知
