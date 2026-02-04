@@ -90,6 +90,8 @@ def run(
     retina_masks=False,
     corn_len_calc=False,
     save_masks=False,  # save segmentation masks as class ID maps
+    no_show_masks=False,  # do not show segmentation masks on output images (invert of show_masks)
+    no_show_boxes=False,  # hide bounding boxes
     is_compare=False,  # save comparison image with original and predicted
     is_analyze=False  # whether to perform inference analysis
 ):
@@ -108,7 +110,7 @@ def run(
             for pair in config_data['source_label_pairs']:
                 source_path = pair.get('source', '')
                 label_dir = pair.get('label_dir', '')
-                save_dir_name = pair.get('save_dir_name', '')
+                save_dir_name = str(pair.get('save_dir_name', ''))
                 if source_path:
                     source_label_pairs.append((source_path, label_dir, save_dir_name))
         LOGGER.info(f"Loaded {len(source_label_pairs)} source-label pairs from {config}")
@@ -150,7 +152,7 @@ def run(
             LOGGER.info(f"Loaded class configuration: {class_config}")
     else:
         # 兼容原始方式，只使用单个source
-        source_label_pairs = [(str(source), '', '')]
+        source_label_pairs = [(str(source), '', str(''))]
     
     save_img = not nosave  # save inference images
 
@@ -526,10 +528,11 @@ def run(
                         n = (det[:, 5] == c).sum()  # detections per class
                         s += f"{n} {names[int(c)]}{'s' * (n > 1)}, "  # add to string
 
-                    # Mask plotting
-                    annotator.masks(masks,
-                                    colors=[colors(x, True) for x in det[:, 5]],
-                                    im_gpu=None if retina_masks else im[i])
+                    # Mask plotting - default is True, only skip if no_show_masks is True
+                    if not no_show_masks:
+                        annotator.masks(masks,
+                                        colors=[colors(x, True) for x in det[:, 5]],
+                                        im_gpu=None if retina_masks else im[i])
 
                     # 不需要重复初始化image_analysis
                     
@@ -564,7 +567,8 @@ def run(
                     if save_img or save_crop or view_img:  # Add bbox to image
                         c = int(cls)  # integer class
                         label = None if hide_labels else (names[c] if hide_conf else f'{names[c]} {conf:.2f}')
-                        annotator.box_label(xyxy, label, color=colors(c, True))
+                        if not no_show_boxes:
+                            annotator.box_label(xyxy, label, color=colors(c, True))
                         # annotator.draw.polygon(segments[j], outline=colors(c, True), width=3)
                     if save_crop:
                         save_one_box(xyxy, imc, file=pair_save_dir / 'crops' / names[c] / f'{p.stem}.jpg', BGR=True)
@@ -698,6 +702,8 @@ def parse_opt():
     parser.add_argument('--retina-masks', action='store_true', help='whether to plot masks in native resolution')
     parser.add_argument('--corn-len-calc', action='store_true', help='when calculate corn length')
     parser.add_argument('--save-masks', action='store_true', help='save segmentation masks as class ID maps to *.txt')
+    parser.add_argument('--no-show-masks', action='store_true', help='do not show segmentation masks on output images')
+    parser.add_argument('--no-show-boxes', action='store_true', help='hide bounding boxes')
     parser.add_argument('--is-compare', default=False, action='store_true', help='save comparison image with original and predicted (will be overridden by config file)')
     parser.add_argument('--is-analyze', default=False, action='store_true', help='perform inference analysis (will be overridden by config file)')
     opt = parser.parse_args()
