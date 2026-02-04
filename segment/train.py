@@ -72,7 +72,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
     # callbacks.run('on_pretrain_routine_start')
 
     # User Args
-    only_corn = opt.only_corn
+    object_seg = opt.object_seg
 
     # Directories
     w = save_dir / 'weights'  # weights dir
@@ -197,7 +197,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
         shuffle=True,
         mask_downsample_ratio=mask_ratio,
         overlap_mask=overlap,
-        only_corn=only_corn
+        object_seg=object_seg
     )
     labels = np.concatenate(dataset.labels, 0)
     print(labels)
@@ -220,7 +220,7 @@ def train(hyp, opt, device, callbacks):  # hyp is path/to/hyp.yaml or hyp dictio
                                        mask_downsample_ratio=mask_ratio,
                                        overlap_mask=overlap,
                                        prefix=colorstr('val: '),
-                                       only_corn=only_corn)[0]
+                                       object_seg=object_seg)[0]
 
         if not resume:
             if not opt.noautoanchor:
@@ -510,7 +510,7 @@ def parse_opt(known=False):
     parser.add_argument('--no-overlap', action='store_true', help='Overlap masks train faster at slightly less mAP')
 
     # User Args
-    parser.add_argument('--only-corn', type=int, default=0, help='Only train seg corn')
+    parser.add_argument('--object-seg', type=int, default=0, help='Set 1 to Object seg, 0 to normal seg')
 
     return parser.parse_known_args()[0] if known else parser.parse_args()
 

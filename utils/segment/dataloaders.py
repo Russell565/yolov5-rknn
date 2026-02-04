@@ -38,7 +38,7 @@ def create_dataloader(path,
                       shuffle=False,
                       mask_downsample_ratio=1,
                       overlap_mask=False,
-                      only_corn=0):
+                      object_seg=0):
     if rect and shuffle:
         LOGGER.warning('WARNING ⚠️ --rect is incompatible with DataLoader shuffle, setting shuffle=False')
         shuffle = False
@@ -58,7 +58,7 @@ def create_dataloader(path,
             prefix=prefix,
             downsample_ratio=mask_downsample_ratio,
             overlap=overlap_mask,
-            only_corn=only_corn)
+            object_seg=object_seg)
 
     batch_size = min(batch_size, len(dataset))
     nd = torch.cuda.device_count()  # number of CUDA devices
@@ -82,14 +82,12 @@ def create_dataloader(path,
 
 
 
-def img2labelseg_paths(img_paths, only_corn=0):
+def img2labelseg_paths(img_paths, object_seg=0):
     # Define label paths as a function of image paths
-    if only_corn == 1:
-        sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_corn_seg{os.sep}'  # /images/, /labels_seg/ substrings
-    elif only_corn == 0:
+    if object_seg == 1:
+        sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_object_seg{os.sep}'  # /images/, /labels_seg/ substrings
+    elif object_seg == 0:
         sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_seg{os.sep}'  # /images/, /labels_seg/ substrings
-    elif only_corn == 2:
-        sa, sb = f'{os.sep}images{os.sep}', f'{os.sep}labels_seg_defect{os.sep}'
 
     return [sb.join(x.rsplit(sa, 1)).rsplit('.', 1)[0] + '.txt' for x in img_paths]
 
@@ -113,18 +111,18 @@ class LoadImagesAndLabelsAndMasks(LoadImagesAndLabels):  # for training/testing
         prefix="",
         downsample_ratio=1,
         overlap=False,
-        only_corn=0,
+        object_seg=0,
     ):
-        self.only_corn = only_corn
+        self.object_seg = object_seg
         super().__init__(path, img_size, batch_size, augment, hyp, rect, image_weights, cache_images, single_cls,
                          stride, pad, min_items, prefix)
         self.downsample_ratio = downsample_ratio
         self.overlap = overlap
         self.init_labels_files()
-        
+
     def init_labels_files(self):
         # 替换标签路径生产逻辑，分割标签从labels_seg目录中读取
-        self.label_files = img2labelseg_paths(self.im_files, self.only_corn)
+        self.label_files = img2labelseg_paths(self.im_files, self.object_seg)
 
     def __getitem__(self, index):
         index = self.indices[index]  # linear, shuffled, or image_weights
