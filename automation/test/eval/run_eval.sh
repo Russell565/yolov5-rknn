@@ -628,6 +628,10 @@ for weight_path in WEIGHTS_TO_TEST:
     # 3.8 实现真实的IOU匹配逻辑，计算准确的匹配数和类别匹配率
     print("\n- 计算指标...")
     
+    # 初始化漏检误检图片记录
+    missed_detections = {}
+    false_detections = {}
+    
     for cls_id, stat in cls_stats.items():
         # 获取原始统计数据
         gt_count_original = stat['gt_count']
@@ -741,6 +745,176 @@ for weight_path in WEIGHTS_TO_TEST:
         # 打印统计信息
         print(f"  类别: {cn_name}, 图片数: {img_count}, 真实分割: {gt_count_original}, 预测分割: {pred_count_original}, 匹配分割: {match_count}, 类别匹配: {class_match_count}, 类别匹配率: {class_match_rate:.4f}")
     
+# 3.9 识别并记录漏检误检图片
+print("\n- 识别并记录漏检误检图片...")
+
+# 为每个权重创建漏检误检记录目录
+error_log_dir = os.path.join(RESULT_OUTPUT_DIR, "error_analysis")
+os.makedirs(error_log_dir, exist_ok=True)
+
+# 遍历所有数据集，识别漏检误检图片
+for dataset in datasets:
+    dataset_name = dataset['name']
+    dataset_path = dataset['img_path']
+    img_subdir = dataset.get('img_subdir', 'images')
+    label_subdir = dataset.get('label_subdir', 'labels')
+    
+    print(f"\n  分析数据集: {dataset_name}")
+    
+    # 获取图片目录和标签目录
+    img_dir = os.path.join(dataset_path, img_subdir)
+    label_dir = os.path.join(dataset_path, label_subdir)
+    
+    # 获取预测结果目录
+    dataset_output_dir = os.path.join(weight_output_dir, dataset_name)
+    pred_labels_dir = os.path.join(dataset_output_dir, 'labels')
+    
+    # 检查目录是否存在
+    if not os.path.exists(img_dir) or not os.path.exists(label_dir) or not os.path.exists(pred_labels_dir):
+        print(f"  目录不存在，跳过分析")
+        continue
+    
+    # 获取所有标签文件
+    label_files = [f for f in os.listdir(label_dir) if f.endswith('.txt')]
+    
+    for label_file in label_files:
+        # 获取图片文件名
+        img_filename = label_file.replace('.txt', '')
+        img_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+        img_path = None
+        
+        # 查找图片文件
+        for ext in img_extensions:
+            potential_img_path = os.path.join(img_dir, img_filename + ext)
+            if os.path.exists(potential_img_path):
+                img_path = potential_img_path
+                break
+        
+        if not img_path:
+            continue
+        
+        # 读取真实标签
+        gt_labels = {}
+        gt_path = os.path.join(label_dir, label_file)
+        try:
+            with open(gt_path, 'r') as f:
+                lines = f.readlines()
+                for line in lines:
+                    line = line.strip()
+                    if line:
+                        parts = line.split()
+                        if len(parts) > 0:
+                            cls_id = parts[0]
+                            if cls_id in cls_stats:
+                                # 应用像素过滤
+                                annotation = [cls_id] + parts[1:]
+                                filtered_annotations = filter_annotations_by_pixel_range([annotation])
+                                if filtered_annotations:
+                                    if cls_id not in gt_labels:
+                                        gt_labels[cls_id] = 0
+                                    gt_labels[cls_id] += 1
+        except Exception as e:
+            continue
+        
+        # 读取预测标签
+        pred_labels = {}
+        pred_path = os.path.join(pred_labels_dir, label_file)
+        if os.path.exists(pred_path):
+            try:
+                with open(pred_path, 'r') as f:
+                    lines = f.readlines()
+                    for line in lines:
+                        line = line.strip()
+                        if line:
+                            parts = line.split()
+                            if len(parts) > 0:
+                                try:
+                                    cls_id = parts[0]
+                                    # 提取置信度
+                                    conf = 0.0
+                                    if len(parts) > 1:
+                                        try:
+                                            conf = float(parts[-1])
+                                        except ValueError:
+                                            continue
+                                    
+                                    # 根据置信度阈值过滤
+                                    if conf < CONF_THRES:
+                                        continue
+                                    
+                                    # 应用像素过滤
+                                    annotation = [cls_id] + parts[1:-1]
+                                    filtered_annotations = filter_annotations_by_pixel_range([annotation])
+                                    if filtered_annotations:
+                                        # 处理类别ID
+                                        if cls_id.replace('.', '').isdigit():
+                                            cls_id = str(int(float(cls_id)))
+                                            if cls_id in cls_stats:
+                                                if cls_id not in pred_labels:
+                                                    pred_labels[cls_id] = 0
+                                                pred_labels[cls_id] += 1
+                                except Exception as e:
+                                    continue
+            except Exception as e:
+                pass
+        
+        # 识别漏检和误检
+        has_missed = False
+        has_false = False
+        
+        # 检查漏检
+        for cls_id, count in gt_labels.items():
+            pred_count = pred_labels.get(cls_id, 0)
+            if pred_count < count:
+                has_missed = True
+                if cls_id not in missed_detections:
+                    missed_detections[cls_id] = []
+                missed_detections[cls_id].append(img_path)
+        
+        # 检查误检
+        for cls_id, count in pred_labels.items():
+            gt_count = gt_labels.get(cls_id, 0)
+            if count > gt_count:
+                has_false = True
+                if cls_id not in false_detections:
+                    false_detections[cls_id] = []
+                false_detections[cls_id].append(img_path)
+
+# 保存漏检误检记录
+print("\n- 保存漏检误检记录...")
+
+# 保存漏检记录
+if missed_detections:
+    missed_file = os.path.join(error_log_dir, f"{epoch}_missed_detections.txt")
+    with open(missed_file, 'w') as f:
+        f.write(f"漏检记录 - Epoch: {epoch}\n")
+        f.write("=" * 80 + "\n")
+        for cls_id, img_paths in missed_detections.items():
+            cls_name = cls_stats[cls_id]['cn_name']
+            f.write(f"类别: {cls_name} (ID: {cls_id})\n")
+            f.write(f"漏检图片数量: {len(img_paths)}\n")
+            f.write("图片路径:\n")
+            for img_path in img_paths:
+                f.write(f"  {img_path}\n")
+            f.write("-" * 80 + "\n")
+    print(f"  漏检记录已保存到: {missed_file}")
+
+# 保存误检记录
+if false_detections:
+    false_file = os.path.join(error_log_dir, f"{epoch}_false_detections.txt")
+    with open(false_file, 'w') as f:
+        f.write(f"误检记录 - Epoch: {epoch}\n")
+        f.write("=" * 80 + "\n")
+        for cls_id, img_paths in false_detections.items():
+            cls_name = cls_stats[cls_id]['cn_name']
+            f.write(f"类别: {cls_name} (ID: {cls_id})\n")
+            f.write(f"误检图片数量: {len(img_paths)}\n")
+            f.write("图片路径:\n")
+            for img_path in img_paths:
+                f.write(f"  {img_path}\n")
+            f.write("-" * 80 + "\n")
+    print(f"  误检记录已保存到: {false_file}")
+
 # 4. 保存Excel文件
 print(f"\n- 保存评估结果到: {RESULT_FILE}")
 try:
@@ -938,12 +1112,16 @@ try:
 except KeyError:
     print("- 未找到标签保存配置，跳过保存")
 
-# 7. 清理推理结果，只保留xlsx文件
+# 7. 清理推理结果，保留xlsx文件和error_analysis目录
 print("- 清理推理结果...")
 
-# 只保留最终的结果文件，删除其他所有文件
+# 只保留最终的结果文件和error_analysis目录，删除其他所有文件
 if os.path.exists(RESULT_OUTPUT_DIR):
     for root, dirs, files in os.walk(RESULT_OUTPUT_DIR):
+        # 跳过error_analysis目录
+        if "error_analysis" in dirs:
+            dirs.remove("error_analysis")
+        
         for file in files:
             file_path = os.path.join(root, file)
             if file_path != RESULT_FILE:
@@ -954,6 +1132,10 @@ if os.path.exists(RESULT_OUTPUT_DIR):
     
     # 删除空目录
     for root, dirs, files in os.walk(RESULT_OUTPUT_DIR, topdown=False):
+        # 跳过error_analysis目录
+        if "error_analysis" in dirs:
+            dirs.remove("error_analysis")
+        
         for dir_name in dirs:
             dir_path = os.path.join(root, dir_name)
             try:
@@ -962,7 +1144,7 @@ if os.path.exists(RESULT_OUTPUT_DIR):
             except Exception as e:
                 print(f"  删除目录失败: {dir_path}, 错误: {e}")
 
-print("- 清理完成，只保留xlsx文件")
+print("- 清理完成，保留xlsx文件和error_analysis目录")
 EOF
     
     if [ $? -eq 0 ]; then
