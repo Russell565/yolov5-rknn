@@ -163,12 +163,12 @@ main() {
         
         # 确定RKNN文件名
         if [ -n "$CUSTOM_NAME" ]; then
-            # 使用自定义名称
-            RKNN_NAME="${CUSTOM_NAME}.rknn"
+            # 使用自定义名称（不添加.rknn后缀，由转换脚本处理）
+            RKNN_NAME="$CUSTOM_NAME"
             log_info "使用自定义RKNN文件名: $RKNN_NAME"
         else
-            # 使用默认文件名（权重文件名）
-            RKNN_NAME="${WEIGHT_NAME}.rknn"
+            # 使用默认文件名（权重文件名，不添加.rknn后缀，由转换脚本处理）
+            RKNN_NAME="$WEIGHT_NAME"
             log_info "使用默认RKNN文件名: $RKNN_NAME"
         fi
         
