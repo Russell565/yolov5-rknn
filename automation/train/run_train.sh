@@ -262,6 +262,90 @@ EOF
             log_success "依赖列表已保存到: $ENV_SAVE_PATH/requirements.txt"
         fi
     fi
+
+    # 执行标签预处理（仅对det模式）
+    if [ "$TRAIN_MODE" = "det" ]; then
+        # 检查是否启用标签对齐
+        LABEL_ALIGNMENT_ENABLE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train'].get('label_alignment', {}).get('enable', 0))")
+        
+        if [ "$LABEL_ALIGNMENT_ENABLE" -eq 1 ]; then
+            log_info "执行标签预处理..."
+            
+            # 获取data配置文件路径
+            DATA_CONFIG=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['data'])")
+            
+            if [ -f "$DATA_CONFIG" ]; then
+                log_info "解析数据集配置文件: $DATA_CONFIG"
+                
+                # 提取path和所有train、val路径
+                DATA_INFO=$(python3 -c "
+import yaml
+config = yaml.safe_load(open('$DATA_CONFIG'))
+path = config.get('path', '')
+paths = []
+if 'train' in config:
+    if isinstance(config['train'], list):
+        paths.extend(config['train'])
+    else:
+        paths.append(config['train'])
+if 'val' in config:
+    if isinstance(config['val'], list):
+        paths.extend(config['val'])
+    else:
+        paths.append(config['val'])
+print(path)
+print('\n'.join(paths))
+")
+                
+                # 解析DATA_INFO，第一行是path，后续是数据路径
+                DATA_PATH=$(echo "$DATA_INFO" | head -n 1)
+                DATA_PATHS=$(echo "$DATA_INFO" | tail -n +2)
+                
+                # 执行标签预处理
+                PREPROCESS_SCRIPT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train'].get('label_alignment', {}).get('script_path', '/home/user/cv_project/python_tool/shell/pre_process/Label_alignment.py'))")
+                if [ -f "$PREPROCESS_SCRIPT" ]; then
+                    for path in $DATA_PATHS; do
+                        # 构建完整路径
+                        if [[ "$path" != /* ]]; then
+                            # 相对路径，基于数据集配置文件中的path字段
+                            if [ -n "$DATA_PATH" ]; then
+                                FULL_PATH="$DATA_PATH/$path"
+                            else
+                                # 如果没有path字段，使用数据集配置文件的目录作为基础路径
+                                DATA_DIR=$(dirname "$DATA_CONFIG")
+                                FULL_PATH="$DATA_DIR/$path"
+                            fi
+                        else
+                            # 绝对路径
+                            FULL_PATH="$path"
+                        fi
+                        
+                        # 执行预处理
+                        if [ -d "$FULL_PATH" ]; then
+                            log_info "预处理标签路径: $FULL_PATH"
+                            python3 "$PREPROCESS_SCRIPT" "$FULL_PATH"
+                            
+                            if [ $? -eq 0 ]; then
+                                log_success "标签预处理完成: $FULL_PATH"
+                            else
+                                log_warning "标签预处理可能存在问题: $FULL_PATH"
+                            fi
+                        else
+                            log_warning "路径不存在，跳过预处理: $FULL_PATH"
+                        fi
+                    done
+                    log_success "所有标签预处理任务已完成"
+                else
+                    log_warning "预处理脚本不存在: $PREPROCESS_SCRIPT"
+                fi
+            else
+                log_warning "数据集配置文件不存在: $DATA_CONFIG"
+            fi
+            log_info "标签预处理阶段完成，继续执行训练流程"
+        else
+            log_info "跳过标签预处理（未开启）"
+        fi
+    fi
     
     # 7. 执行训练命令
     log_info "执行训练命令..."
