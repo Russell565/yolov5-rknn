@@ -287,13 +287,9 @@ for dataset in datasets:
         if "--save-conf" not in test_cmd:
             test_cmd += " --save-conf"
     
-    # 只在检测模型上添加像素过滤参数，分割模型不支持这些参数
-    if PIXEL_FILTER_ENABLE == 1 and "detect.py" in TEST_SCRIPT:
-        test_cmd = "{0} --pixel-filter --left {1} --right {2} --top {3} --bottom {4}".format(
-            test_cmd, PIXEL_FILTER_LEFT, PIXEL_FILTER_RIGHT, PIXEL_FILTER_TOP, PIXEL_FILTER_BOTTOM
-        )
-    elif PIXEL_FILTER_ENABLE == 1:
-        print("[INFO] 分割模型不支持像素过滤参数，跳过添加")
+    # 注意：像素过滤参数在标准YOLOv5中不支持，我们只在后处理时进行像素过滤
+    if PIXEL_FILTER_ENABLE == 1:
+        print("[INFO] 像素过滤将在后续的后处理步骤中进行，跳过在测试命令中添加参数")
     
     print("[INFO] 执行测试命令: {0}".format(test_cmd))
     
@@ -566,11 +562,38 @@ for weight_path in WEIGHTS_TO_TEST:
     # 查找所有预测结果目录
     all_labels_dirs = []
     
-    # 使用find命令查找所有labels目录（忽略其他权重的结果）
-    find_cmd = f"find '{weight_output_dir}' -type d -name 'labels'"
-    result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True)
-    all_labels_dirs = result.stdout.strip().split('\n')
-    all_labels_dirs = [d for d in all_labels_dirs if d and os.path.exists(d)]
+    # 打印调试信息
+    print(f"- 权重输出目录: {weight_output_dir}")
+    print(f"- 目录是否存在: {os.path.exists(weight_output_dir)}")
+    
+    # 检查目录结构
+    if os.path.exists(weight_output_dir):
+        print(f"- 目录内容: {os.listdir(weight_output_dir)}")
+        # 遍历所有数据集目录
+        for dataset in datasets:
+            dataset_name = dataset['name']
+            dataset_output_dir = os.path.join(weight_output_dir, dataset_name)
+            print(f"- 数据集目录: {dataset_output_dir}")
+            print(f"- 数据集目录是否存在: {os.path.exists(dataset_output_dir)}")
+            if os.path.exists(dataset_output_dir):
+                print(f"- 数据集目录内容: {os.listdir(dataset_output_dir)}")
+                # 检查labels目录
+                labels_dir = os.path.join(dataset_output_dir, 'labels')
+                print(f"- 标签目录: {labels_dir}")
+                print(f"- 标签目录是否存在: {os.path.exists(labels_dir)}")
+                if os.path.exists(labels_dir):
+                    print(f"- 标签目录内容: {os.listdir(labels_dir)[:10]}")  # 只显示前10个文件
+                    all_labels_dirs.append(labels_dir)
+    else:
+        print(f"- 权重输出目录不存在")
+    
+    # 也尝试使用find命令作为备份
+    if not all_labels_dirs:
+        print("- 使用find命令查找labels目录...")
+        find_cmd = f"find '{weight_output_dir}' -type d -name 'labels'"
+        result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True)
+        all_labels_dirs = result.stdout.strip().split('\n')
+        all_labels_dirs = [d for d in all_labels_dirs if d and os.path.exists(d)]
     
     print(f"- 找到 {len(all_labels_dirs)} 个预测labels目录")
     
@@ -612,12 +635,18 @@ for weight_path in WEIGHTS_TO_TEST:
                                     filtered_annotations = filter_annotations_by_pixel_range([annotation])
                                     if filtered_annotations:
                                         # 处理类别ID
-                                        if cls_id.replace('.', '').isdigit():
-                                            cls_id = str(int(float(cls_id)))
+                                        try:
+                                            # 尝试转换类别ID为整数
+                                            if cls_id.replace('.', '').isdigit():
+                                                cls_id = str(int(float(cls_id)))
+                                            # 检查类别ID是否在配置中
                                             if cls_id in cls_stats:
                                                 # 统计该类别的预测数量，不区分数据集
                                                 cls_stats[cls_id]['pred_count'] += 1
                                                 total_pred_count += 1
+                                        except Exception as e:
+                                            print(f"  处理类别ID失败: {cls_id}, 错误: {e}")
+                                            continue
                                 except Exception as e:
                                     continue
             except Exception as e:
@@ -682,8 +711,9 @@ for weight_path in WEIGHTS_TO_TEST:
             avg_iou = min(avg_iou, 0.95)  # 上限0.95
             total_iou = match_count * avg_iou
             matched_count = match_count
-            
-            print(f"  类别: {stat['cn_name']}, 真实分割: {gt_count_original}, 预测分割: {pred_count_original}, 匹配分割: {match_count}, 类别匹配: {class_match_count}")
+        
+        # 打印详细的统计信息，帮助调试
+        print(f"  类别: {stat['cn_name']}, 真实分割: {gt_count_original}, 预测分割: {pred_count_original}, 匹配分割: {match_count}, 类别匹配: {class_match_count}")
         
         # 计算漏检数量
         # 漏检数 = 真实分割数 - 匹配数
@@ -1112,15 +1142,426 @@ try:
 except KeyError:
     print("- 未找到标签保存配置，跳过保存")
 
-# 7. 清理推理结果，保留xlsx文件和error_analysis目录
+# 7. 对best.pt权重生成对比图（如果是best权重）
+print("- 检查是否需要生成对比图...")
+
+for weight_path in WEIGHTS_TO_TEST:
+    weight_name = os.path.basename(weight_path).replace('.pt', '')
+    
+    # 只对best权重生成对比图
+    if weight_name == 'best':
+        print("- 对best.pt权重生成对比图")
+        
+        # 获取YOLOv5目录
+        yolov5_dir = "/home/user/cv_project/corn-detection/yolov5-rknn-self"
+        
+        # 遍历所有测试数据集
+        datasets = DATASET_CONFIG['datasets']
+        for dataset in datasets:
+            dataset_name = dataset['name']
+            img_path = dataset['img_path']
+            img_subdir = dataset.get('img_subdir', 'images')
+            label_subdir = dataset.get('label_subdir', 'labels')
+            
+            # 构建完整的测试集路径
+            test_set_path = os.path.join(img_path, img_subdir)
+            
+            # 构建输出目录
+            output_dir = os.path.join(RESULT_OUTPUT_DIR, "visualization", "best", dataset_name)
+            os.makedirs(output_dir, exist_ok=True)
+            
+            # 检查测试集路径是否存在
+            if not os.path.exists(img_path):
+                print(f"- 测试集路径不存在: {img_path}")
+                continue
+            
+            # 检查images子目录是否存在
+            if not os.path.exists(os.path.join(img_path, img_subdir)):
+                print(f"- 图片目录不存在: {os.path.join(img_path, img_subdir)}")
+                continue
+            
+            # 检查labels子目录是否存在
+            if not os.path.exists(os.path.join(img_path, label_subdir)):
+                print(f"- 标签目录不存在: {os.path.join(img_path, label_subdir)}")
+                continue
+            
+            print(f"- 处理测试集: {dataset_name}")
+            print(f"- 图片目录: {os.path.join(img_path, img_subdir)}")
+            print(f"- 标签目录: {os.path.join(img_path, label_subdir)}")
+            
+            # 1. 读取类别信息
+            class_names = []
+            try:
+                classes = config['class_config']['classes']
+                for cls_id in sorted(classes.keys(), key=lambda x: int(x)):
+                    class_names.append(classes[cls_id]['name'])
+                print(f"- 类别信息: {class_names}")
+            except KeyError:
+                print("- 未找到类别配置，使用默认类别")
+                class_names = ['corn', 'tujian']
+            
+            # 2. 读取真实标签和预测标签
+            import os
+            import cv2
+            import numpy as np
+            
+            # 3. 生成对比图
+            # 遍历所有图片文件
+            image_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
+            img_dir = os.path.join(img_path, img_subdir)
+            label_dir = os.path.join(img_path, label_subdir)
+            
+            # 构建预测标签目录路径
+            pred_label_dir = os.path.join(RESULT_OUTPUT_DIR, weight_name, dataset_name, 'labels')
+            
+            if not os.path.exists(pred_label_dir):
+                print(f"- 预测标签目录不存在: {pred_label_dir}")
+                continue
+            
+            # 读取预测图像目录
+            pred_img_dir = os.path.join(RESULT_OUTPUT_DIR, weight_name, dataset_name)
+            
+            # 计算IoU的函数
+            def calculate_bbox_iou(box1, box2):
+                box1_x1 = box1[0] - box1[2] / 2
+                box1_y1 = box1[1] - box1[3] / 2
+                box1_x2 = box1[0] + box1[2] / 2
+                box1_y2 = box1[1] + box1[3] / 2
+
+                box2_x1 = box2[0] - box2[2] / 2
+                box2_y1 = box2[1] - box2[3] / 2
+                box2_x2 = box2[0] + box2[2] / 2
+                box2_y2 = box2[1] + box2[3] / 2
+
+                x1 = max(box1_x1, box2_x1)
+                y1 = max(box1_y1, box2_y1)
+                x2 = min(box1_x2, box2_x2)
+                y2 = min(box1_y2, box2_y2)
+
+                intersection = max(0, x2 - x1) * max(0, y2 - y1)
+
+                box1_area = box1[2] * box1[3]
+                box2_area = box2[2] * box2[3]
+                union = box1_area + box2_area - intersection
+
+                iou = intersection / union if union > 0 else 0
+                return iou
+            
+            # 匹配标注的函数
+            def match_annotations(gt_annos, pred_annos, iou_threshold=0.5):
+                matched_pairs = []
+                unmatched_gt = []
+                unmatched_pred = list(range(len(pred_annos)))
+
+                for gt_idx, gt_anno in enumerate(gt_annos):
+                    best_iou = 0
+                    best_pred_idx = -1
+
+                    for pred_idx, pred_anno in enumerate(pred_annos):
+                        if pred_idx not in unmatched_pred:
+                            continue
+
+                        if gt_anno[0] != pred_anno[0]:
+                            continue
+
+                        iou = calculate_bbox_iou(gt_anno[1:5], pred_anno[1:5])
+
+                        if iou > best_iou and iou >= iou_threshold:
+                            best_iou = iou
+                            best_pred_idx = pred_idx
+
+                    if best_pred_idx != -1:
+                        matched_pairs.append({
+                            'gt_idx': gt_idx,
+                            'pred_idx': best_pred_idx,
+                            'iou': best_iou
+                        })
+                        unmatched_pred.remove(best_pred_idx)
+                    else:
+                        unmatched_gt.append(gt_idx)
+
+                return matched_pairs, unmatched_gt, unmatched_pred
+            
+            # 遍历所有标签文件
+            for label_file in os.listdir(label_dir):
+                if not label_file.endswith('.txt'):
+                    continue
+                
+                # 获取文件名（不含扩展名）
+                file_name = os.path.splitext(label_file)[0]
+                
+                # 查找对应的图像文件
+                img_file = None
+                for ext in image_extensions:
+                    potential_img = os.path.join(img_dir, f"{file_name}{ext}")
+                    if os.path.exists(potential_img):
+                        img_file = potential_img
+                        break
+                
+                if not img_file:
+                    print(f"- 未找到对应的图像文件: {file_name}")
+                    continue
+                
+                # 查找对应的预测标签文件
+                pred_label_file = os.path.join(pred_label_dir, label_file)
+                if not os.path.exists(pred_label_file):
+                    print(f"- 未找到对应的预测标签文件: {label_file}")
+                    continue
+                
+                # 查找对应的预测图像文件
+                pred_img_file = None
+                for ext in image_extensions:
+                    potential_pred_img = os.path.join(pred_img_dir, f"{file_name}{ext}")
+                    if os.path.exists(potential_pred_img):
+                        pred_img_file = potential_pred_img
+                        break
+                
+                if not pred_img_file:
+                    print(f"- 未找到对应的预测图像文件: {file_name}")
+                    continue
+                
+                # 读取真实标签
+                gt_annotations = []
+                with open(os.path.join(label_dir, label_file), 'r') as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) >= 5:
+                            class_id = int(parts[0])
+                            bbox = [float(x) for x in parts[1:5]]
+                            gt_annotations.append([class_id] + bbox)
+                
+                # 读取预测标签
+                pred_annotations = []
+                with open(pred_label_file, 'r') as f:
+                    for line in f:
+                        parts = line.strip().split()
+                        if len(parts) >= 5:
+                            class_id = int(parts[0])
+                            bbox = [float(x) for x in parts[1:5]]
+                            pred_annotations.append([class_id] + bbox)
+                
+                # 匹配标注，检查是否有漏检或误检
+                matched_pairs, unmatched_gt, unmatched_pred = match_annotations(gt_annotations, pred_annotations)
+                
+                # 只生成有问题的对比图（有漏检或误检）
+                if not unmatched_gt and not unmatched_pred:
+                    continue  # 没有问题，跳过
+                
+                # 生成颜色映射
+                def generate_color_map(class_count):
+                    base_colors = [
+                        (255, 0, 0),     # 红色
+                        (0, 255, 0),     # 绿色
+                        (0, 0, 255),     # 蓝色
+                        (255, 255, 0),   # 黄色
+                        (255, 0, 255),   # 品红
+                        (0, 255, 255),   # 青色
+                    ]
+                    color_map = {}
+                    for i in range(class_count):
+                        color_map[i] = base_colors[i % len(base_colors)]
+                    return color_map
+                
+                # 绘制边界框
+                def draw_bboxes(image, annotations, color_map):
+                    h, w = image.shape[:2]
+                    img_with_boxes = image.copy()
+                    
+                    for anno in annotations:
+                        class_id = anno[0]
+                        x_center, y_center, width, height = anno[1:5]
+                        
+                        # 转换为像素坐标
+                        x1 = int((x_center - width / 2) * w)
+                        y1 = int((y_center - height / 2) * h)
+                        x2 = int((x_center + width / 2) * w)
+                        y2 = int((y_center + height / 2) * h)
+                        
+                        # 确保坐标在图像范围内
+                        x1 = max(0, min(x1, w-1))
+                        y1 = max(0, min(y1, h-1))
+                        x2 = max(0, min(x2, w-1))
+                        y2 = max(0, min(y2, h-1))
+                        
+                        # 绘制边界框
+                        color = color_map.get(class_id, (0, 255, 0))
+                        cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), color, 2)
+                    
+                    return img_with_boxes
+                
+                # 统计标签数量
+                def count_labels(annotations):
+                    label_counts = {}
+                    for anno in annotations:
+                        class_id = anno[0]
+                        # 使用配置中的类别名称，确保映射正确
+                        class_name = class_names[class_id] if class_id < len(class_names) else f"Class_{class_id}"
+                        if class_name in label_counts:
+                            label_counts[class_name] += 1
+                        else:
+                            label_counts[class_name] = 1
+                    return label_counts
+                
+                # 绘制标签信息
+                def draw_label_info(image, label_counts, position=(20, 30), color=(255, 255, 255), color_map=None):
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    font_scale = 0.8
+                    thickness = 2
+                    line_height = 30
+                    
+                    # 绘制背景矩形
+                    max_width = 0
+                    for label, count in label_counts.items():
+                        text = f"{label}: {count}"
+                        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
+                        if text_size[0] > max_width:
+                            max_width = text_size[0]
+                    
+                    bg_height = line_height * (len(label_counts) + 1)
+                    bg_width = max_width + 40
+                    
+                    # 半透明黑色背景
+                    overlay = image.copy()
+                    cv2.rectangle(overlay, (position[0]-10, position[1]-20), 
+                                 (position[0]+bg_width, position[1]+bg_height), (0, 0, 0), -1)
+                    cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
+                    
+                    # 绘制标签信息
+                    y = position[1]
+                    cv2.putText(image, "Labels:", (position[0], y), font, font_scale, color, thickness)
+                    y += line_height
+                    
+                    for label, count in label_counts.items():
+                        text = f"{label}: {count}"
+                        # 尝试获取标签对应的颜色
+                        label_color = color
+                        if class_names and color_map:
+                            # 查找标签对应的class_id
+                            for class_id, class_name in enumerate(class_names):
+                                if class_name == label:
+                                    label_color = color_map.get(class_id, color)
+                                    break
+                        cv2.putText(image, text, (position[0], y), font, font_scale, label_color, thickness)
+                        y += line_height
+                    
+                    return image
+                
+                # 保持宽高比调整图像大小
+                def resize_keep_aspect(image, target_size):
+                    h, w = image.shape[:2]
+                    target_w, target_h = target_size
+                    
+                    # 计算缩放比例
+                    scale = min(target_w / w, target_h / h)
+                    new_w = int(w * scale)
+                    new_h = int(h * scale)
+                    
+                    # 调整大小
+                    resized = cv2.resize(image, (new_w, new_h))
+                    
+                    # 创建目标尺寸的画布
+                    canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
+                    
+                    # 将调整大小后的图像放在中央
+                    y_offset = (target_h - new_h) // 2
+                    x_offset = (target_w - new_w) // 2
+                    canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
+                    
+                    return canvas
+                
+                # 创建对比可视化图像
+                def create_comparison_visualization(original_img_path, pred_img_path, gt_annotations, pred_annotations, output_path, class_names):
+                    if not os.path.exists(original_img_path):
+                        return False
+                    
+                    # 读取原始图像
+                    original_img = cv2.imread(original_img_path)
+                    if original_img is None:
+                        return False
+                    
+                    # 生成颜色映射
+                    all_class_ids = set()
+                    for anno in gt_annotations + pred_annotations:
+                        all_class_ids.add(anno[0])
+                    max_class_id = max(all_class_ids) if all_class_ids else 0
+                    color_map = generate_color_map(max_class_id + 1)
+                    
+                    # 统计标签数量
+                    gt_label_counts = count_labels(gt_annotations)
+                    pred_label_counts = count_labels(pred_annotations)
+                    
+                    # 绘制标签信息
+                    gt_img = original_img.copy()
+                    pred_img = original_img.copy()  # 使用原始图像，而不是YOLOv5生成的预测图像
+                    
+                    # 在原始图像上绘制真实标签边界框
+                    gt_img = draw_bboxes(gt_img, gt_annotations, color_map)
+                    
+                    # 在原始图像上绘制预测标签边界框
+                    pred_img = draw_bboxes(pred_img, pred_annotations, color_map)
+                    
+                    gt_img = draw_label_info(gt_img, gt_label_counts, color_map=color_map)
+                    pred_img = draw_label_info(pred_img, pred_label_counts, color_map=color_map)
+                    
+                    # 调整图像大小到1920x1080
+                    target_size = (1920, 1080)
+                    
+                    gt_img_resized = resize_keep_aspect(gt_img, target_size)
+                    pred_img_resized = resize_keep_aspect(pred_img, target_size)
+                    
+                    # 添加标题
+                    title_height = 50
+                    title_canvas = np.zeros((title_height, target_size[0], 3), dtype=np.uint8)
+                    
+                    # 真实标签标题
+                    cv2.putText(title_canvas, "Ground Truth (det)", 
+                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    
+                    # 预测标签标题
+                    pred_title = np.zeros((title_height, target_size[0], 3), dtype=np.uint8)
+                    cv2.putText(pred_title, "YOLOv5 Predictions (det)", 
+                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    
+                    # 最终拼接
+                    final_img = np.vstack([title_canvas, gt_img_resized, pred_title, pred_img_resized])
+                    
+                    # 保存结果
+                    cv2.imwrite(output_path, final_img)
+                    return True
+                
+                # 生成对比图
+                output_viz_path = os.path.join(output_dir, f"{file_name}_comparison.jpg")
+                success = create_comparison_visualization(
+                    img_file, pred_img_file, gt_annotations, pred_annotations, output_viz_path, class_names
+                )
+                
+                if success:
+                    print(f"- 生成对比图: {output_viz_path}")
+                else:
+                    print(f"- 生成对比图失败: {file_name}")
+            
+            # 检查输出目录是否有文件
+            files = os.listdir(output_dir)
+            if len(files) == 0:
+                print(f"- 警告: 输出目录为空: {output_dir}")
+            else:
+                print(f"- 输出目录包含 {len(files)} 个文件")
+                for file in files[:5]:  # 显示前5个文件
+                    print(f"  - {file}")
+        
+        break  # 只处理best权重
+
+# 8. 清理推理结果，保留xlsx文件、error_analysis目录和visualization目录
 print("- 清理推理结果...")
 
-# 只保留最终的结果文件和error_analysis目录，删除其他所有文件
+# 只保留最终的结果文件、error_analysis目录和visualization目录，删除其他所有文件
 if os.path.exists(RESULT_OUTPUT_DIR):
     for root, dirs, files in os.walk(RESULT_OUTPUT_DIR):
-        # 跳过error_analysis目录
+        # 跳过error_analysis和visualization目录
         if "error_analysis" in dirs:
             dirs.remove("error_analysis")
+        if "visualization" in dirs:
+            dirs.remove("visualization")
         
         for file in files:
             file_path = os.path.join(root, file)
@@ -1132,9 +1573,11 @@ if os.path.exists(RESULT_OUTPUT_DIR):
     
     # 删除空目录
     for root, dirs, files in os.walk(RESULT_OUTPUT_DIR, topdown=False):
-        # 跳过error_analysis目录
+        # 跳过error_analysis和visualization目录
         if "error_analysis" in dirs:
             dirs.remove("error_analysis")
+        if "visualization" in dirs:
+            dirs.remove("visualization")
         
         for dir_name in dirs:
             dir_path = os.path.join(root, dir_name)
@@ -1144,7 +1587,7 @@ if os.path.exists(RESULT_OUTPUT_DIR):
             except Exception as e:
                 print(f"  删除目录失败: {dir_path}, 错误: {e}")
 
-print("- 清理完成，保留xlsx文件和error_analysis目录")
+print("- 清理完成，保留xlsx文件、error_analysis目录和visualization目录")
 EOF
     
     if [ $? -eq 0 ]; then
