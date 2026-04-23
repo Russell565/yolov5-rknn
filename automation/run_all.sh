@@ -210,6 +210,40 @@ main() {
     # 输出SFTP推送日志提示
     SFTP_LOG_FILE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config.get('logging', {}).get('log_file', 'sftp_push.log'))" 2>/dev/null || echo "sftp_push.log")
     log_info "SFTP推送日志：tail -f $SFTP_LOG_FILE"
+    
+    # 7. 压缩output_root目录（如果配置了）
+    OUTPUT_ROOT_COMPRESS=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base'].get('output_root_compress', 0))" 2>/dev/null || echo 0)
+    if [ "$OUTPUT_ROOT_COMPRESS" -eq 1 ]; then
+        log_info "执行output_root目录压缩任务..."
+        OUTPUT_ROOT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base']['output_root'])")
+        if [ -d "$OUTPUT_ROOT" ]; then
+            # 获取output_root目录的父目录和目录名
+            OUTPUT_ROOT_PARENT=$(dirname "$OUTPUT_ROOT")
+            OUTPUT_ROOT_NAME=$(basename "$OUTPUT_ROOT")
+            # 构建压缩文件名
+            COMPRESSED_FILE="$OUTPUT_ROOT_PARENT/${OUTPUT_ROOT_NAME}.tar.gz"
+            
+            # 执行压缩操作
+            log_info "压缩目录: $OUTPUT_ROOT"
+            log_info "输出文件: $COMPRESSED_FILE"
+            
+            # 使用tar命令压缩目录
+            tar -czf "$COMPRESSED_FILE" -C "$OUTPUT_ROOT_PARENT" "$OUTPUT_ROOT_NAME"
+            
+            if [ $? -eq 0 ]; then
+                log_success "目录压缩成功: $COMPRESSED_FILE"
+                # 计算压缩文件大小
+                COMPRESSED_SIZE=$(du -h "$COMPRESSED_FILE" | cut -f1)
+                log_info "压缩文件大小: $COMPRESSED_SIZE"
+            else
+                log_error "目录压缩失败"
+            fi
+        else
+            log_warning "output_root目录不存在: $OUTPUT_ROOT"
+        fi
+    else
+        log_info "跳过目录压缩任务（未开启）"
+    fi
 }
 
 # 执行主函数
