@@ -191,6 +191,50 @@ main() {
             log_info "权重监控脚本正在运行，PID: $MONITOR_PID"
             log_info "监控脚本将持续运行，直到训练完成或手动停止"
             log_info "可使用以下命令停止监控脚本：kill $MONITOR_PID"
+            
+            # 等待监控脚本完成（如果训练任务开启）
+            if [ "$TRAIN_OPEN" -eq 1 ]; then
+                log_info "等待训练和监控任务完成..."
+                # 检查训练是否完成（通过train-finished.txt文件）
+                TRAIN_PROJECT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['project'])")
+                TRAIN_NAME=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['name'])")
+                TRAIN_FINISHED_FILE="$TRAIN_PROJECT/$TRAIN_NAME/train-finished.txt"
+                
+                # 等待train-finished.txt文件出现，最多等待24小时
+                log_info "等待训练完成，检查文件: $TRAIN_FINISHED_FILE"
+                wait_time=0
+                max_wait=86400  # 24小时
+                while [ ! -f "$TRAIN_FINISHED_FILE" ] && [ $wait_time -lt $max_wait ]; do
+                    sleep 60  # 每分钟检查一次
+                    wait_time=$((wait_time + 60))
+                    log_info "等待训练完成... ($wait_time秒)"
+                done
+                
+                if [ -f "$TRAIN_FINISHED_FILE" ]; then
+                    log_success "训练已完成"
+                else
+                    log_warning "训练可能尚未完成，但已达到最大等待时间"
+                fi
+                
+                # 检查监控脚本是否仍在运行
+                if ps -p $MONITOR_PID > /dev/null; then
+                    log_info "监控脚本仍在运行，等待其完成..."
+                    # 等待监控脚本退出，最多等待30分钟
+                    wait_time=0
+                    max_wait=1800  # 30分钟
+                    while ps -p $MONITOR_PID > /dev/null && [ $wait_time -lt $max_wait ]; do
+                        sleep 30  # 每30秒检查一次
+                        wait_time=$((wait_time + 30))
+                        log_info "等待监控脚本完成... ($wait_time秒)"
+                    done
+                    
+                    if ! ps -p $MONITOR_PID > /dev/null; then
+                        log_success "监控脚本已完成"
+                    else
+                        log_warning "监控脚本仍在运行，但已达到最大等待时间"
+                    fi
+                fi
+            fi
         else
             log_warning "监控脚本PID文件存在，但进程已停止"
             rm "$CURRENT_DIR/monitor.pid"
@@ -243,6 +287,89 @@ main() {
         fi
     else
         log_info "跳过目录压缩任务（未开启）"
+    fi
+    
+    # 8. 移动output_root目录内容到project/name目录
+    log_info "执行目录内容移动任务..."
+    OUTPUT_ROOT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base']['output_root'])")
+    PROJECT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['project'])")
+    NAME=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['name'])")
+    TARGET_DIR="$PROJECT/$NAME"
+    
+    log_info "输出根目录: $OUTPUT_ROOT"
+    log_info "项目目录: $PROJECT"
+    log_info "模型名称: $NAME"
+    log_info "目标目录: $TARGET_DIR"
+    
+    # 检查目录是否存在
+    if [ -d "$OUTPUT_ROOT" ]; then
+        log_info "源目录存在: $OUTPUT_ROOT"
+        # 列出源目录内容
+        log_info "源目录内容:" 
+        ls -la "$OUTPUT_ROOT"
+    else
+        log_warning "源目录不存在: $OUTPUT_ROOT"
+    fi
+    
+    if [ -d "$TARGET_DIR" ]; then
+        log_info "目标目录存在: $TARGET_DIR"
+        # 列出目标目录内容
+        log_info "目标目录内容:" 
+        ls -la "$TARGET_DIR"
+    else
+        log_warning "目标目录不存在: $TARGET_DIR"
+        # 尝试创建目标目录
+        log_info "尝试创建目标目录..."
+        mkdir -p "$TARGET_DIR"
+        if [ $? -eq 0 ]; then
+            log_success "目标目录已创建: $TARGET_DIR"
+        else
+            log_error "无法创建目标目录: $TARGET_DIR"
+        fi
+    fi
+    
+    # 执行复制操作
+    if [ -d "$OUTPUT_ROOT" ] && [ -d "$TARGET_DIR" ]; then
+        log_info "开始复制目录内容..."
+        
+        # 尝试使用cp命令复制
+        log_info "使用cp命令复制..."
+        cp -r "$OUTPUT_ROOT"/* "$TARGET_DIR/"
+        
+        if [ $? -eq 0 ]; then
+            log_success "目录内容复制完成: $OUTPUT_ROOT -> $TARGET_DIR"
+        else
+            log_warning "cp命令复制失败，尝试使用rsync..."
+            # 尝试使用rsync命令复制
+            rsync -av "$OUTPUT_ROOT/" "$TARGET_DIR/"
+            
+            if [ $? -eq 0 ]; then
+                log_success "目录内容复制完成（使用rsync）: $OUTPUT_ROOT -> $TARGET_DIR"
+            else
+                log_warning "rsync命令复制失败，尝试使用find命令..."
+                # 尝试使用find命令复制文件
+                find "$OUTPUT_ROOT" -type f -exec cp {} "$TARGET_DIR/" \;
+                
+                if [ $? -eq 0 ]; then
+                    log_success "目录内容复制完成（使用find）: $OUTPUT_ROOT -> $TARGET_DIR"
+                else
+                    log_error "所有复制尝试都失败了"
+                fi
+            fi
+        fi
+        
+        # 验证复制结果
+        log_info "验证复制结果..."
+        SOURCE_FILES=$(find "$OUTPUT_ROOT" -type f | wc -l)
+        TARGET_FILES=$(find "$TARGET_DIR" -type f | wc -l)
+        log_info "源目录文件数: $SOURCE_FILES"
+        log_info "目标目录文件数: $TARGET_FILES"
+        
+        # 列出复制后的目标目录内容
+        log_info "复制后目标目录内容:" 
+        ls -la "$TARGET_DIR"
+    else
+        log_error "源目录或目标目录不存在，无法执行复制操作"
     fi
 }
 
