@@ -39,14 +39,30 @@ def read_yolo_label(file_path, mode='det'):
             try:
                 class_id = int(parts[0])
                 if mode == 'det' and len(parts) >= 5:
-                    # 检测模式: class_id, x_center, y_center, width, height
+                    # 检测模式: class_id, x_center, y_center, width, height, [confidence]
                     bbox = [float(x) for x in parts[1:5]]
-                    annotations.append([class_id] + bbox)
+                    # 如果有置信度信息，添加到标注中
+                    if len(parts) >= 6:
+                        confidence = float(parts[5])
+                        annotations.append([class_id] + bbox + [confidence])
+                    else:
+                        annotations.append([class_id] + bbox + [1.0])  # 默认置信度1.0
+                elif mode == 'seg' and len(parts) >= 7:
+                    # 分割模式: class_id, x1, y1, x2, y2, ..., xn, yn, confidence
+                    # 至少需要 class_id + 3个点(6个坐标) + confidence
+                    coords_count = len(parts) - 2  # 减去 class_id 和 confidence
+                    if coords_count % 2 == 0:
+                        polygon = [float(x) for x in parts[1:-1]]  # 不包含最后一个置信度
+                        confidence = float(parts[-1])
+                        annotations.append([class_id] + polygon + [confidence])
+                    else:
+                        # 如果坐标数不是偶数，可能没有置信度或格式有误
+                        polygon = [float(x) for x in parts[1:]]
+                        annotations.append([class_id] + polygon + [1.0])  # 默认置信度1.0
                 elif mode == 'seg' and len(parts) >= 3:
-                    # 分割模式: class_id, x1, y1, x2, y2, ...
-                    # 至少需要3个点才能形成多边形
+                    # 兼容没有置信度的旧格式
                     polygon = [float(x) for x in parts[1:]]
-                    annotations.append([class_id] + polygon)
+                    annotations.append([class_id] + polygon + [1.0])  # 默认置信度1.0
             except ValueError:
                 continue
 
@@ -451,7 +467,9 @@ def draw_segmentation_polygons(image, annotations, color, label_prefix="", class
     
     for anno in annotations:
         class_id = anno[0]
-        polygon_points = anno[1:]
+        # 分割模式：置信度在最后一位，多边形点是 anno[1:-1]
+        polygon_points = anno[1:-1] if len(anno) > 2 else anno[1:]
+        confidence = anno[-1] if len(anno) > 1 else None
         
         # 根据类别ID获取颜色
         current_color = color
@@ -473,13 +491,17 @@ def draw_segmentation_polygons(image, annotations, color, label_prefix="", class
         # 绘制多边形
         cv2.polylines(img_with_polygons, [points], True, current_color, 2)
         
-        # 添加标签
+        # 添加标签（包含置信度）
         if class_names and class_id < len(class_names):
             class_name = class_names[class_id]
         else:
             class_name = str(class_id)
         
-        label = f"{label_prefix}{class_name}"
+        # 如果有置信度，添加到标签中
+        if confidence is not None and confidence < 1.0:
+            label = f"{label_prefix}{class_name}: {confidence:.2f}"
+        else:
+            label = f"{label_prefix}{class_name}"
         
         # 计算标签位置（多边形重心）
         M = cv2.moments(points)
@@ -514,6 +536,8 @@ def draw_bboxes(image, annotations, color, label_prefix="", class_names=None, co
     for anno in annotations:
         class_id = anno[0]
         x_center, y_center, width, height = anno[1:5]
+        # 获取置信度（如果有的话）
+        confidence = anno[5] if len(anno) > 5 else None
         
         # 根据类别ID获取颜色
         current_color = color
@@ -535,13 +559,18 @@ def draw_bboxes(image, annotations, color, label_prefix="", class_names=None, co
         # 绘制边界框
         cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), current_color, 2)
         
-        # 添加标签
+        # 添加标签（包含置信度）
         if class_names and class_id < len(class_names):
             class_name = class_names[class_id]
         else:
             class_name = str(class_id)
         
-        label = f"{label_prefix}{class_name}"
+        # 如果有置信度，添加到标签中
+        if confidence is not None and confidence < 1.0:
+            label = f"{label_prefix}{class_name}: {confidence:.2f}"
+        else:
+            label = f"{label_prefix}{class_name}"
+        
         label_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)[0]
         
         # 绘制标签背景

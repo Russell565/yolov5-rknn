@@ -1,7 +1,12 @@
 #!/bin/bash
 
-# 测试评估脚本
-# 参考 /home/user/cv_project/python_tool/shell/post_process/post_process.sh
+# 测试评估脚本 - 重构版
+# 功能：
+# 1. 读取配置
+# 2. 激活conda环境
+# 3. 调用测试执行脚本
+# 4. 调用评估器脚本
+# 5. 调用可视化脚本
 
 # 检查参数
 if [ $# -ne 5 ] && [ $# -ne 6 ]; then
@@ -21,7 +26,7 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
 # 日志函数
 log_info() {
@@ -50,36 +55,39 @@ main() {
     log_info "conda环境: $CONDA_ENV"
     log_info "输出根目录: $OUTPUT_ROOT"
     log_info "权重文件: $WEIGHT_FILE"
-    
+
+    # 获取脚本所在目录
+    SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+
     # 1. 读取配置文件
     log_info "读取配置文件: $CONFIG_FILE"
-    
-    # 获取测试数据集配置
+
+    # 获取数据集配置
     DATASET_CONFIG=$(python3 -c "import yaml, json; config=yaml.safe_load(open('$CONFIG_FILE')); print(json.dumps(config['test']['dataset_config']))")
-    
+
     # 获取测试模式
     TEST_MODE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['mode'])")
-    
-    # 2. 解析测试数据集配置
-    log_info "解析测试数据集配置..."
-    
+
+    # 2. 解析配置
+    log_info "解析配置..."
+
     # 获取是否压缩结果
     ZIP_ENABLE=$(python3 -c "import json; config=json.loads('$DATASET_CONFIG'); print(config['zip'])")
-    
-    # 获取像素过滤配置
+
+    # 获取像素过滤配置（用于传递）
     PIXEL_FILTER_ENABLE=$(python3 -c "import json; config=json.loads('$DATASET_CONFIG'); print(config['pixel_filter']['enable'])")
     PIXEL_FILTER_LEFT=$(python3 -c "import json; config=json.loads('$DATASET_CONFIG'); print(config['pixel_filter']['left'])")
     PIXEL_FILTER_RIGHT=$(python3 -c "import json; config=json.loads('$DATASET_CONFIG'); print(config['pixel_filter']['right'])")
     PIXEL_FILTER_TOP=$(python3 -c "import json; config=json.loads('$DATASET_CONFIG'); print(config['pixel_filter']['top'])")
     PIXEL_FILTER_BOTTOM=$(python3 -c "import json; config=json.loads('$DATASET_CONFIG'); print(config['pixel_filter']['bottom'])")
-    
+
     # 3. 获取测试结果保存配置
     RESULT_FILE=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['result']['file_path'])" | sed "s|\${base.output_root}|$OUTPUT_ROOT|g")
     RESULT_OUTPUT_DIR=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['result']['output_dir'])" | sed "s|\${base.output_root}|$OUTPUT_ROOT|g")
-    
+
     # 4. 激活conda环境
     log_info "激活conda环境: $CONDA_ENV"
-    
+
     # 确保conda可用，尝试多种conda安装路径
     CONDA_PROFILES=(
         "$HOME/miniconda3/etc/profile.d/conda.sh"
@@ -87,7 +95,7 @@ main() {
         "/opt/miniconda3/etc/profile.d/conda.sh"
         "/opt/anaconda3/etc/profile.d/conda.sh"
     )
-    
+
     CONDA_PROFILE_FOUND=0
     for PROFILE in "${CONDA_PROFILES[@]}"; do
         if [ -f "$PROFILE" ]; then
@@ -97,47 +105,35 @@ main() {
             break
         fi
     done
-    
+
     if [ $CONDA_PROFILE_FOUND -eq 0 ]; then
         log_error "未找到conda配置文件，请确保conda已正确安装"
         exit 1
     fi
-    
-    # 使用source activate而不是conda activate
-    source activate "$CONDA_ENV"
+
+    # 使用conda activate命令激活环境
+    conda activate "$CONDA_ENV"
     if [ $? -ne 0 ]; then
         log_error "无法激活conda环境: $CONDA_ENV"
         exit 1
     fi
     log_success "已激活conda环境: $CONDA_ENV"
-    
+
     # 5. 获取训练生成的权重路径
-    log_info "获取训练生成的权重路径..."
-    
+    log_info "获取权重路径..."
+
     # 获取训练输出目录
     TRAIN_PROJECT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['project'])")
     TRAIN_NAME=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['name'])")
     TRAIN_OUTPUT_DIR="$TRAIN_PROJECT/$TRAIN_NAME"
-    
-    # 检查是否提供了特定的权重文件
-    if [ -z "$WEIGHT_FILE" ]; then
-        # 检查训练输出目录是否存在
-        if [ ! -d "$TRAIN_OUTPUT_DIR" ]; then
-            log_warning "训练输出目录不存在: $TRAIN_OUTPUT_DIR，跳过测试"
-            exit 0
-        fi
-    fi
-    
-    # 6. 执行测试
-    log_info "执行测试..."
-    
+
     # 初始化要测试的权重列表
     WEIGHTS_TO_TEST=()
-    
+
     # 检查是否提供了特定的权重文件
     if [ -n "$WEIGHT_FILE" ] && [ -f "$WEIGHT_FILE" ]; then
         # 使用提供的权重文件
-        WEIGHTS_TO_TEST=($WEIGHT_FILE)
+        WEIGHTS_TO_TEST=("$WEIGHT_FILE")
         log_info "使用指定权重文件测试: $WEIGHT_FILE"
     else
         # 使用默认逻辑：测试best.pt和last.pt
@@ -151,1463 +147,191 @@ main() {
             log_info "测试默认权重文件: best.pt 和 last.pt"
         fi
     fi
-    
-    # 根据不同情况执行测试
-    if [ ${#WEIGHTS_TO_TEST[@]} -gt 0 ]; then
-        for WEIGHT_PATH in "${WEIGHTS_TO_TEST[@]}"; do
-            if [ -f "$WEIGHT_PATH" ]; then
-                log_info "测试权重: $WEIGHT_PATH"
-                
-                # 为每个权重创建输出目录
-                WEIGHT_NAME=$(basename "$WEIGHT_PATH" .pt)
-                WEIGHT_OUTPUT_DIR="$RESULT_OUTPUT_DIR/$WEIGHT_NAME"
-                mkdir -p "$WEIGHT_OUTPUT_DIR"
-                
-                # 7. 遍历所有测试数据集
-                python3 - <<PYTHON_CODE
-import json
-import subprocess
-import os
 
-# 解析数据集配置
-dataset_config = json.loads('$DATASET_CONFIG')
-datasets = dataset_config['datasets']
-
-# 获取Bash传递的变量
-TEST_SCRIPT = "$TEST_SCRIPT"
-WEIGHT_PATH = "$WEIGHT_PATH"
-WEIGHT_OUTPUT_DIR = "$WEIGHT_OUTPUT_DIR"
-ALL_ARGS = "$ALL_ARGS"
-PIXEL_FILTER_ENABLE = $PIXEL_FILTER_ENABLE
-PIXEL_FILTER_LEFT = $PIXEL_FILTER_LEFT
-PIXEL_FILTER_RIGHT = $PIXEL_FILTER_RIGHT
-PIXEL_FILTER_TOP = $PIXEL_FILTER_TOP
-PIXEL_FILTER_BOTTOM = $PIXEL_FILTER_BOTTOM
-ZIP_ENABLE = $ZIP_ENABLE
-
-# 循环处理每个数据集
-for dataset in datasets:
-    print("\n[INFO] 处理数据集: {0}".format(dataset['name']))
-    
-    # 获取数据集配置
-    dataset_name = dataset['name']
-    img_path = dataset['img_path']
-    img_subdir = dataset.get('img_subdir', 'images')  # 默认images目录
-    label_subdir = dataset.get('label_subdir', 'labels')  # 默认labels目录
-    
-    # 自动检测是否有标签文件
-    full_label_path = os.path.join(img_path, label_subdir)
-    has_labels = 1  # 默认有标签
-    if not os.path.exists(full_label_path):
-        # 标签目录不存在，没有标签
-        has_labels = 0
-        print(f"[INFO] 标签目录不存在，自动设置has_labels=0: {full_label_path}")
-    else:
-        # 检查标签目录中是否有.txt文件
-        import glob
-        label_files = glob.glob(os.path.join(full_label_path, '*.txt'))
-        if len(label_files) == 0:
-            # 标签目录存在但没有.txt文件，没有标签
-            has_labels = 0
-            print(f"[INFO] 标签目录存在但没有.txt文件，自动设置has_labels=0: {full_label_path}")
-        else:
-            # 有标签文件，设置has_labels=1
-            has_labels = 1
-            print(f"[INFO] 检测到{len(label_files)}个标签文件，自动设置has_labels=1: {full_label_path}")
-    
-    # 构建完整的图片路径
-    full_img_path = os.path.join(img_path, img_subdir)
-    print("[INFO] 完整图片路径: {0}".format(full_img_path))
-    
-    # 检查图片路径是否存在
-    if not os.path.exists(full_img_path):
-        print("[WARNING] 图片路径不存在: {0}，跳过该数据集".format(full_img_path))
-        continue
-    
-    # 为每个数据集创建输出子目录
-    dataset_output_dir = os.path.join(WEIGHT_OUTPUT_DIR, dataset_name)
-    os.makedirs(dataset_output_dir, exist_ok=True)
-    
-    # 8. 构建测试命令
-    # 提取ALL_ARGS中不包含--project和--name及其值的部分，避免参数重复
-    filtered_args = []
-    args_list = ALL_ARGS.split()
-    i = 0
-    while i < len(args_list):
-        arg = args_list[i]
-        if arg == '--project' or arg == '--name':
-            # 跳过当前参数和下一个参数值
-            i += 2
-        else:
-            filtered_args.append(arg)
-            i += 1
-    filtered_args_str = ' '.join(filtered_args)
-    
-    # 分割模型需要特殊处理，确保--project和--name参数正确
-    # 同时确保--save-txt和--save-conf参数被正确传递
-    test_cmd = "python {0} --source {1} --weights {2} --project {3} --name {4} --save-txt --save-conf --exist-ok {5}".format(
-        TEST_SCRIPT, full_img_path, WEIGHT_PATH, WEIGHT_OUTPUT_DIR, dataset_name, filtered_args_str
-    )
-    # 确保--save-txt参数只出现一次，正确处理带值的参数
-    def remove_duplicate_args(args_str):
-        args = args_str.split()
-        seen = set()
-        result = []
-        i = 0
-        while i < len(args):
-            arg = args[i]
-            if arg.startswith('--'):
-                # 这是一个参数名
-                if arg not in seen:
-                    seen.add(arg)
-                    result.append(arg)
-                    # 如果后面还有元素且不是参数名，那就是值
-                    if i + 1 < len(args) and not args[i+1].startswith('--'):
-                        result.append(args[i+1])
-                        i += 1
-            else:
-                # 这是一个值或其他内容
-                result.append(arg)
-            i += 1
-        return ' '.join(result)
-    
-    test_cmd = remove_duplicate_args(test_cmd)
-    
-    # 确保--conf-thres参数被正确传递
-    if "--conf-thres" not in test_cmd:
-        # 从配置文件中获取置信度阈值
-        import yaml
-        config = yaml.safe_load(open('$CONFIG_FILE'))
-        conf_thres = config['test']['core_params']['conf_thres']
-        test_cmd += f" --conf-thres {conf_thres}"
-    
-    # 对于分割模型，确保添加--save-conf参数，这样txt文件中会包含置信度
-    if "segment/predict.py" in test_cmd:
-        # 分割模型需要添加--save-conf参数来保存置信度到txt文件
-        if "--save-conf" not in test_cmd:
-            test_cmd += " --save-conf"
-    
-    # 注意：像素过滤参数在标准YOLOv5中不支持，我们只在后处理时进行像素过滤
-    if PIXEL_FILTER_ENABLE == 1:
-        print("[INFO] 像素过滤将在后续的后处理步骤中进行，跳过在测试命令中添加参数")
-    
-    print("[INFO] 执行测试命令: {0}".format(test_cmd))
-    
-    # 执行测试
-    result = subprocess.run(test_cmd, shell=True, capture_output=True, text=True)
-    
-    # 打印测试命令输出
-    print("[INFO] 测试命令输出:")
-    print("[INFO] 标准输出:")
-    print(result.stdout)
-    if result.stderr:
-        print("[INFO] 执行信息:")
-        print(result.stderr)
-    
-    if result.returncode == 0:
-        print("[SUCCESS] 测试完成: {0}".format(dataset_name))
-        
-        # 打印生成的目录结构，帮助调试
-        print("[INFO] 测试结果目录结构:")
-        subprocess.run(f"find '{WEIGHT_OUTPUT_DIR}' -type d | sort", shell=True, text=True)
-        print("[INFO] 生成的所有文件:")
-        subprocess.run(f"find '{WEIGHT_OUTPUT_DIR}' -type f | sort", shell=True, text=True)
-        print("[INFO] 生成的txt文件:")
-        subprocess.run(f"find '{WEIGHT_OUTPUT_DIR}' -name '*.txt' | head -20", shell=True, text=True)
-        print("[INFO] 检查具体数据集目录:")
-        subprocess.run(f"ls -la '{dataset_output_dir}'", shell=True, text=True)
-        
-        # 9. 压缩结果（如果启用）
-        if ZIP_ENABLE == 1:
-            print("[INFO] 压缩测试结果...")
-            zip_cmd = "zip -r {0}/{1}.zip {0}/{1} > /dev/null 2>&1".format(WEIGHT_OUTPUT_DIR, dataset_name)
-            zip_result = subprocess.run(zip_cmd, shell=True, capture_output=True, text=True)
-            
-            if zip_result.returncode == 0:
-                print("[SUCCESS] 结果已压缩: {0}/{1}.zip".format(WEIGHT_OUTPUT_DIR, dataset_name))
-            else:
-                print("[WARNING] 结果压缩失败: {0}".format(zip_result.stderr))
-    else:
-        print("[ERROR] 测试失败: {0}".format(dataset_name))
-        print("[ERROR] 错误信息: {0}".format(result.stderr))
-        # 继续测试其他数据集，不立即退出
-        print("[WARNING] 继续测试下一个数据集...")
-
-PYTHON_CODE
-
-    # 10. 生成评估指标并保存到Excel
-    log_info "生成评估指标..."
-        
-        # 将权重文件列表转换为JSON格式，以便Python脚本正确解析
-        WEIGHTS_JSON=$(printf '%s\n' "${WEIGHTS_TO_TEST[@]}" | python3 -c "import json, sys; print(json.dumps([line.strip() for line in sys.stdin]))")
-        
-        # 获取配置文件中的置信度阈值
-        CONF_THRES=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['core_params']['conf_thres'])")
-        
-        # 使用Python创建Excel文件，按Epoch和类别组织数据
-        # 传递必要的变量给Python脚本
-        DATASET_CONFIG_JSON="$DATASET_CONFIG"
-        RESULT_OUTPUT_DIR="$RESULT_OUTPUT_DIR"
-        CONF_THRES="$CONF_THRES"
-        
-        python3 - <<EOF
-import pandas as pd
-import os
-import yaml
-import glob
-import json
-import shutil
-from openpyxl import Workbook
-
-# 读取配置
-config = yaml.safe_load(open('$CONFIG_FILE'))
-classes = config['class_config']['classes']
-
-# 获取测试相关信息
-RESULT_FILE = '$RESULT_FILE'
-WEIGHTS_JSON = '$WEIGHTS_JSON'
-WEIGHTS_TO_TEST = json.loads(WEIGHTS_JSON)
-ALL_ARGS = '$ALL_ARGS'
-DATASET_CONFIG = json.loads('$DATASET_CONFIG_JSON')
-RESULT_OUTPUT_DIR = '$RESULT_OUTPUT_DIR'
-CONF_THRES = float('$CONF_THRES')
-
-# 正确提取IOU阈值的逻辑
-args_list = ALL_ARGS.split()
-iou_threshold = '0.5'  # 默认值
-for i in range(len(args_list)):
-    if args_list[i] == '--iou-thres' and i + 1 < len(args_list):
-        iou_threshold = args_list[i + 1]
-        break
-
-# 1. 检查是否需要创建新文件或追加到现有文件
-if os.path.exists(RESULT_FILE):
-    # 打开现有文件进行追加
-    from openpyxl import load_workbook
-    wb = load_workbook(RESULT_FILE)
-    ws = wb.active
-    print(f"- 追加到现有Excel文件: {RESULT_FILE}")
-else:
-    # 创建新文件
-    wb = Workbook()
-    ws = wb.active
-    ws.title = '评估结果'
-    # 添加表头，增加类别匹配准确率指标，放在召回率后面
-    headers = ['Epoch', '类别', '总图片数', '真实分割', '预测分割', '匹配分割', '漏检数', '误检数', '召回率', '类别匹配率', '精确率', 'F1分数', '平均IoU', 'IoU阈值']
-    ws.append(headers)
-    print(f"- 创建新Excel文件: {RESULT_FILE}")
-
-# 3. 遍历每个权重文件
-for weight_path in WEIGHTS_TO_TEST:
-    # 在写入新的权重测试结果前添加空行（如果不是第一次写入）
-    if os.path.exists(RESULT_FILE) and ws.max_row > 1:
-        ws.append([])
-        print("- 在新权重测试结果前添加空行，提高可读性")
-    print(f"\n=== 处理权重文件: {weight_path} ===")
-    
-    # 3.1 获取权重名称和epoch
-    weight_name = os.path.basename(weight_path).replace('.pt', '')
-    
-    # 解析Epoch信息，从权重文件名中提取
-    if weight_name.startswith('epoch'):
-        # 如epoch5.pt -> Epoch为5
-        epoch = weight_name.replace('epoch', '')
-    elif weight_name == 'best':
-        epoch = 'best'
-    elif weight_name == 'last':
-        epoch = 'last'
-    else:
-        epoch = weight_name
-    
-    print(f"- Epoch: {epoch}")
-    
-    # 3.2 获取测试结果目录
-    weight_output_dir = os.path.join(RESULT_OUTPUT_DIR, weight_name)
-    print(f"- 权重输出目录: {weight_output_dir}")
-    
-    # 3.3 初始化各类别统计
-    cls_stats = {}
-    for cls_id in classes:
-        cls_id_str = str(cls_id)
-        cls_stats[cls_id_str] = {
-            'gt_count': 0,          # 真实分割数量（所有数据集总和）
-            'pred_count': 0,         # 预测分割数量（所有数据集总和）
-            'img_set': set(),        # 包含该类别的图片集合（所有数据集总和）
-            'cn_name': classes[cls_id]['cn_name']
-        }
-    
-    # 3.4 获取像素过滤配置
-    pixel_filter = {
-        'enable': False,
-        'left': 0,
-        'right': 0,
-        'top': 0,
-        'bottom': 0
-    }
-    
-    # 从配置中读取像素过滤设置
-    try:
-        pixel_filter_config = config['test']['dataset_config']['pixel_filter']
-        pixel_filter = {
-            'enable': pixel_filter_config['enable'] == 1,
-            'left': pixel_filter_config['left'],
-            'right': pixel_filter_config['right'],
-            'top': pixel_filter_config['top'],
-            'bottom': pixel_filter_config['bottom']
-        }
-    except KeyError:
-        print("- 未找到像素过滤配置，使用默认配置")
-    
-    print(f"- 像素过滤配置: {pixel_filter}")
-    
-    # 3.5 像素过滤函数
-    def filter_annotations_by_pixel_range(annotations, img_width=640, img_height=640):
-        """
-        根据像素过滤范围过滤标注
-        annotations: 标注列表，每个标注是 [cls_id, ...坐标...]
-        """
-        if not pixel_filter['enable']:
-            return annotations
-        
-        filtered = []
-        valid_left = pixel_filter['left']
-        valid_right = img_width - pixel_filter['right']
-        valid_top = pixel_filter['top']
-        valid_bottom = img_height - pixel_filter['bottom']
-        
-        if valid_left >= valid_right or valid_top >= valid_bottom:
-            return annotations
-        
-        for anno in annotations:
-            if len(anno) < 1:
-                continue
-            
-            cls_id = anno[0]
-            coords = anno[1:]
-            
-            all_valid = True
-            for i in range(0, len(coords), 2):
-                if i + 1 < len(coords):
-                    x = float(coords[i]) * img_width  # 归一化坐标转像素
-                    y = float(coords[i+1]) * img_height
-                    if x < valid_left or x > valid_right or y < valid_top or y > valid_bottom:
-                        all_valid = False
-                        break
-            
-            if all_valid:
-                filtered.append(anno)
-            
-        return filtered
-    
-    # 3.6 遍历所有数据集，统计真实分割和包含该类别的图片
-    datasets = DATASET_CONFIG['datasets']
-    print(f"- 数据集数量: {len(datasets)}")
-    
-    for dataset in datasets:
-        dataset_name = dataset['name']
-        dataset_path = dataset['img_path']
-        img_subdir = dataset.get('img_subdir', 'images')
-        label_subdir = dataset.get('label_subdir', 'labels')
-        
-        print(f"\n  处理数据集: {dataset_name}")
-        print(f"  数据集路径: {dataset_path}")
-        
-        # 获取图片目录和标签目录
-        img_dir = os.path.join(dataset_path, img_subdir)
-        label_dir = os.path.join(dataset_path, label_subdir)
-        
-        # 统计真实分割和包含该类别的图片
-        if os.path.exists(label_dir):
-            label_files = [f for f in os.listdir(label_dir) if f.endswith('.txt')]
-            print(f"  标签文件数量: {len(label_files)}")
-            
-            for label_file in label_files:
-                label_path = os.path.join(label_dir, label_file)
-                img_filename = label_file.replace('.txt', '')
-                
-                with open(label_path, 'r') as f:
-                    lines = f.readlines()
-                    for line in lines:
-                        line = line.strip()
-                        if line:
-                            parts = line.split()
-                            if len(parts) > 0:
-                                try:
-                                    cls_id = parts[0]
-                                    if cls_id in cls_stats:
-                                        # 构建标注对象，用于像素过滤
-                                        annotation = [cls_id] + parts[1:]
-                                        # 应用像素过滤
-                                        filtered_annotations = filter_annotations_by_pixel_range([annotation])
-                                        if filtered_annotations:
-                                            # 统计真实分割数量
-                                            cls_stats[cls_id]['gt_count'] += 1
-                                            # 记录包含该类别的图片
-                                            cls_stats[cls_id]['img_set'].add(img_filename)
-                                except Exception as e:
-                                    print(f"  解析标签文件失败: {label_file}, 错误: {e}")
-        else:
-            print(f"  标签目录不存在，跳过统计真实分割")
-    
-    # 3.7 统一统计所有预测结果 - 所有数据集作为一个整体
-    print(f"\n- 统一统计所有预测结果...")
-    
-    # 确保subprocess模块已导入
-    import subprocess
-    
-    # 重置预测计数，避免之前的统计结果影响
-    for cls_id in cls_stats:
-        cls_stats[cls_id]['pred_count'] = 0
-    
-    # 查找所有预测结果目录
-    all_labels_dirs = []
-    
-    # 打印调试信息
-    print(f"- 权重输出目录: {weight_output_dir}")
-    print(f"- 目录是否存在: {os.path.exists(weight_output_dir)}")
-    
-    # 检查目录结构
-    if os.path.exists(weight_output_dir):
-        print(f"- 目录内容: {os.listdir(weight_output_dir)}")
-        # 遍历所有数据集目录
-        for dataset in datasets:
-            dataset_name = dataset['name']
-            dataset_output_dir = os.path.join(weight_output_dir, dataset_name)
-            print(f"- 数据集目录: {dataset_output_dir}")
-            print(f"- 数据集目录是否存在: {os.path.exists(dataset_output_dir)}")
-            if os.path.exists(dataset_output_dir):
-                print(f"- 数据集目录内容: {os.listdir(dataset_output_dir)}")
-                # 检查labels目录
-                labels_dir = os.path.join(dataset_output_dir, 'labels')
-                print(f"- 标签目录: {labels_dir}")
-                print(f"- 标签目录是否存在: {os.path.exists(labels_dir)}")
-                if os.path.exists(labels_dir):
-                    print(f"- 标签目录内容: {os.listdir(labels_dir)[:10]}")  # 只显示前10个文件
-                    all_labels_dirs.append(labels_dir)
-    else:
-        print(f"- 权重输出目录不存在")
-    
-    # 也尝试使用find命令作为备份
-    if not all_labels_dirs:
-        print("- 使用find命令查找labels目录...")
-        find_cmd = f"find '{weight_output_dir}' -type d -name 'labels'"
-        result = subprocess.run(find_cmd, shell=True, capture_output=True, text=True)
-        all_labels_dirs = result.stdout.strip().split('\n')
-        all_labels_dirs = [d for d in all_labels_dirs if d and os.path.exists(d)]
-    
-    print(f"- 找到 {len(all_labels_dirs)} 个预测labels目录")
-    
-    # 遍历所有labels目录，统计预测结果
-    total_pred_count = 0
-    for labels_dir in all_labels_dirs:
-        print(f"- 处理预测目录: {labels_dir}")
-        
-        pred_files = [f for f in os.listdir(labels_dir) if f.endswith('.txt')]
-        for pred_file in pred_files:
-            pred_path = os.path.join(labels_dir, pred_file)
-            try:
-                with open(pred_path, 'r') as f:
-                    lines = f.readlines()
-                    for line in lines:
-                        line = line.strip()
-                        if line:
-                            parts = line.split()
-                            if len(parts) > 0:
-                                try:
-                                    # 分割模式输出格式：<class_id> <x1> <y1> ... <confidence>
-                                    cls_id = parts[0]
-                                    
-                                    # 提取置信度（最后一个元素）
-                                    conf = 0.0
-                                    if len(parts) > 1:
-                                        try:
-                                            conf = float(parts[-1])
-                                        except ValueError:
-                                            continue
-                                    
-                                    # 根据置信度阈值过滤
-                                    if conf < CONF_THRES:
-                                        continue
-                                    
-                                    # 构建标注对象，用于像素过滤（移除置信度，只保留坐标）
-                                    annotation = [cls_id] + parts[1:-1]
-                                    # 应用像素过滤
-                                    filtered_annotations = filter_annotations_by_pixel_range([annotation])
-                                    if filtered_annotations:
-                                        # 处理类别ID
-                                        try:
-                                            # 尝试转换类别ID为整数
-                                            if cls_id.replace('.', '').isdigit():
-                                                cls_id = str(int(float(cls_id)))
-                                            # 检查类别ID是否在配置中
-                                            if cls_id in cls_stats:
-                                                # 统计该类别的预测数量，不区分数据集
-                                                cls_stats[cls_id]['pred_count'] += 1
-                                                total_pred_count += 1
-                                        except Exception as e:
-                                            print(f"  处理类别ID失败: {cls_id}, 错误: {e}")
-                                            continue
-                                except Exception as e:
-                                    continue
-            except Exception as e:
-                continue
-    
-    print(f"- 总共统计到 {total_pred_count} 个预测分割")
-    
-    # 3.8 实现真实的IOU匹配逻辑，计算准确的匹配数和类别匹配率
-    print("\n- 计算指标...")
-    
-    # 初始化漏检误检图片记录
-    missed_detections = {}
-    false_detections = {}
-    
-    for cls_id, stat in cls_stats.items():
-        # 获取原始统计数据
-        gt_count_original = stat['gt_count']
-        pred_count_original = stat['pred_count']
-        
-        # 初始化匹配数、IOU总和、类别匹配数
-        match_count = 0
-        class_match_count = 0
-        total_iou = 0.0
-        matched_count = 0
-        
-        # 读取配置中的IOU阈值
-        iou_thres = float(iou_threshold)
-        
-        # 实现改进的匹配逻辑
-        if pred_count_original == 0:
-            match_count = 0
-            class_match_count = 0
-        elif gt_count_original == 0:
-            match_count = 0
-            class_match_count = 0
-        else:
-            # 计算预测数和真实分割数的比例
-            pred_gt_ratio = pred_count_original / gt_count_original
-            
-            # 基于比例的匹配数计算，同时考虑类别匹配
-            if pred_gt_ratio >= 1.0:
-                # 预测数足够或超过真实分割数
-                match_count = int(gt_count_original * 0.95)
-                # 假设类别匹配率为98%（高置信度预测的类别准确率）
-                class_match_count = int(match_count * 0.98)
-            else:
-                # 预测数不足
-                match_count = int(pred_count_original * 0.98)
-                # 假设类别匹配率为95%（预测不足时的类别准确率）
-                class_match_count = int(match_count * 0.95)
-            
-            # 确保匹配数不超过预测数和真实分割数
-            match_count = min(match_count, pred_count_original, gt_count_original)
-            match_count = max(match_count, 0)
-            
-            # 确保类别匹配数不超过匹配数
-            class_match_count = min(class_match_count, match_count)
-            class_match_count = max(class_match_count, 0)
-            
-            # 计算平均IOU，使用IOU阈值加上一个小的偏移
-            avg_iou = iou_thres + 0.15  # 基于IOU阈值的平均IOU估计
-            avg_iou = min(avg_iou, 0.95)  # 上限0.95
-            total_iou = match_count * avg_iou
-            matched_count = match_count
-        
-        # 打印详细的统计信息，帮助调试
-        print(f"  类别: {stat['cn_name']}, 真实分割: {gt_count_original}, 预测分割: {pred_count_original}, 匹配分割: {match_count}, 类别匹配: {class_match_count}")
-        
-        # 计算漏检数量
-        # 漏检数 = 真实分割数 - 匹配数
-        missed_count = gt_count_original - match_count
-        
-        # 计算误检数量
-        # 误检数 = 预测数 - 匹配数
-        false_count = pred_count_original - match_count
-        
-        # 计算类别误检数量
-        # 类别误检数 = 匹配数 - 类别匹配数
-        class_false_count = match_count - class_match_count
-        
-        # 预测分割数量 = 实际检测到的数量
-        pred_count = pred_count_original
-        
-        # 计算其他指标
-        recall = match_count / gt_count_original if gt_count_original > 0 else 0
-        precision = match_count / pred_count if pred_count > 0 else 0
-        f1 = 2 * (precision * recall) / (precision + recall) if (precision + recall) > 0 else 0
-        
-        # 计算类别匹配率（类别正确的匹配数占总匹配数的比例）
-        class_match_rate = class_match_count / match_count if match_count > 0 else 0
-        
-        # 计算真实的平均IOU
-        avg_iou = total_iou / matched_count if matched_count > 0 else 0.0
-        
-        # 将计算出的指标保存到cls_stats字典中，用于生成微信通知
-        stat['recall'] = recall
-        stat['precision'] = precision
-        stat['f1_score'] = f1
-        stat['class_match_rate'] = class_match_rate
-        stat['avg_iou'] = avg_iou
-        
-        # 获取类别中文名称
-        cn_name = stat['cn_name']
-        # 统计该类别的图片数量
-        img_count = len(stat['img_set'])
-        
-        # 写入Excel，调整类别匹配率位置，放在召回率后面
-        row = [
-            epoch,
-            cn_name,
-            img_count,
-            gt_count_original,
-            pred_count,
-            match_count,
-            missed_count,
-            false_count,
-            round(recall, 4),
-            round(class_match_rate, 4),
-            round(precision, 4),
-            round(f1, 4),
-            round(avg_iou, 4),
-            iou_threshold
-        ]
-        ws.append(row)
-        
-        # 打印统计信息
-        print(f"  类别: {cn_name}, 图片数: {img_count}, 真实分割: {gt_count_original}, 预测分割: {pred_count_original}, 匹配分割: {match_count}, 类别匹配: {class_match_count}, 类别匹配率: {class_match_rate:.4f}")
-    
-# 3.9 识别并记录漏检误检图片
-print("\n- 识别并记录漏检误检图片...")
-
-# 为每个权重创建漏检误检记录目录
-error_log_dir = os.path.join(RESULT_OUTPUT_DIR, "error_analysis")
-os.makedirs(error_log_dir, exist_ok=True)
-
-# 遍历所有数据集，识别漏检误检图片
-for dataset in datasets:
-    dataset_name = dataset['name']
-    dataset_path = dataset['img_path']
-    img_subdir = dataset.get('img_subdir', 'images')
-    label_subdir = dataset.get('label_subdir', 'labels')
-    
-    print(f"\n  分析数据集: {dataset_name}")
-    
-    # 获取图片目录和标签目录
-    img_dir = os.path.join(dataset_path, img_subdir)
-    label_dir = os.path.join(dataset_path, label_subdir)
-    
-    # 获取预测结果目录
-    dataset_output_dir = os.path.join(weight_output_dir, dataset_name)
-    pred_labels_dir = os.path.join(dataset_output_dir, 'labels')
-    
-    # 检查目录是否存在
-    if not os.path.exists(img_dir) or not os.path.exists(label_dir) or not os.path.exists(pred_labels_dir):
-        print(f"  目录不存在，跳过分析")
-        continue
-    
-    # 获取所有标签文件
-    label_files = [f for f in os.listdir(label_dir) if f.endswith('.txt')]
-    
-    for label_file in label_files:
-        # 获取图片文件名
-        img_filename = label_file.replace('.txt', '')
-        img_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
-        img_path = None
-        
-        # 查找图片文件
-        for ext in img_extensions:
-            potential_img_path = os.path.join(img_dir, img_filename + ext)
-            if os.path.exists(potential_img_path):
-                img_path = potential_img_path
-                break
-        
-        if not img_path:
-            continue
-        
-        # 读取真实标签
-        gt_labels = {}
-        gt_path = os.path.join(label_dir, label_file)
-        try:
-            with open(gt_path, 'r') as f:
-                lines = f.readlines()
-                for line in lines:
-                    line = line.strip()
-                    if line:
-                        parts = line.split()
-                        if len(parts) > 0:
-                            cls_id = parts[0]
-                            if cls_id in cls_stats:
-                                # 应用像素过滤
-                                annotation = [cls_id] + parts[1:]
-                                filtered_annotations = filter_annotations_by_pixel_range([annotation])
-                                if filtered_annotations:
-                                    if cls_id not in gt_labels:
-                                        gt_labels[cls_id] = 0
-                                    gt_labels[cls_id] += 1
-        except Exception as e:
-            continue
-        
-        # 读取预测标签
-        pred_labels = {}
-        pred_path = os.path.join(pred_labels_dir, label_file)
-        if os.path.exists(pred_path):
-            try:
-                with open(pred_path, 'r') as f:
-                    lines = f.readlines()
-                    for line in lines:
-                        line = line.strip()
-                        if line:
-                            parts = line.split()
-                            if len(parts) > 0:
-                                try:
-                                    cls_id = parts[0]
-                                    # 提取置信度
-                                    conf = 0.0
-                                    if len(parts) > 1:
-                                        try:
-                                            conf = float(parts[-1])
-                                        except ValueError:
-                                            continue
-                                    
-                                    # 根据置信度阈值过滤
-                                    if conf < CONF_THRES:
-                                        continue
-                                    
-                                    # 应用像素过滤
-                                    annotation = [cls_id] + parts[1:-1]
-                                    filtered_annotations = filter_annotations_by_pixel_range([annotation])
-                                    if filtered_annotations:
-                                        # 处理类别ID
-                                        if cls_id.replace('.', '').isdigit():
-                                            cls_id = str(int(float(cls_id)))
-                                            if cls_id in cls_stats:
-                                                if cls_id not in pred_labels:
-                                                    pred_labels[cls_id] = 0
-                                                pred_labels[cls_id] += 1
-                                except Exception as e:
-                                    continue
-            except Exception as e:
-                pass
-        
-        # 识别漏检和误检
-        has_missed = False
-        has_false = False
-        
-        # 检查漏检
-        for cls_id, count in gt_labels.items():
-            pred_count = pred_labels.get(cls_id, 0)
-            if pred_count < count:
-                has_missed = True
-                if cls_id not in missed_detections:
-                    missed_detections[cls_id] = []
-                missed_detections[cls_id].append(img_path)
-        
-        # 检查误检
-        for cls_id, count in pred_labels.items():
-            gt_count = gt_labels.get(cls_id, 0)
-            if count > gt_count:
-                has_false = True
-                if cls_id not in false_detections:
-                    false_detections[cls_id] = []
-                false_detections[cls_id].append(img_path)
-
-# 保存漏检误检记录
-print("\n- 保存漏检误检记录...")
-
-# 保存漏检记录
-if missed_detections:
-    missed_file = os.path.join(error_log_dir, f"{epoch}_missed_detections.txt")
-    with open(missed_file, 'w') as f:
-        f.write(f"漏检记录 - Epoch: {epoch}\n")
-        f.write("=" * 80 + "\n")
-        for cls_id, img_paths in missed_detections.items():
-            cls_name = cls_stats[cls_id]['cn_name']
-            f.write(f"类别: {cls_name} (ID: {cls_id})\n")
-            f.write(f"漏检图片数量: {len(img_paths)}\n")
-            f.write("图片路径:\n")
-            for img_path in img_paths:
-                f.write(f"  {img_path}\n")
-            f.write("-" * 80 + "\n")
-    print(f"  漏检记录已保存到: {missed_file}")
-
-# 保存误检记录
-if false_detections:
-    false_file = os.path.join(error_log_dir, f"{epoch}_false_detections.txt")
-    with open(false_file, 'w') as f:
-        f.write(f"误检记录 - Epoch: {epoch}\n")
-        f.write("=" * 80 + "\n")
-        for cls_id, img_paths in false_detections.items():
-            cls_name = cls_stats[cls_id]['cn_name']
-            f.write(f"类别: {cls_name} (ID: {cls_id})\n")
-            f.write(f"误检图片数量: {len(img_paths)}\n")
-            f.write("图片路径:\n")
-            for img_path in img_paths:
-                f.write(f"  {img_path}\n")
-            f.write("-" * 80 + "\n")
-    print(f"  误检记录已保存到: {false_file}")
-
-# 4. 保存Excel文件
-print(f"\n- 保存评估结果到: {RESULT_FILE}")
-try:
-    # 检查目录是否存在，不存在则创建
-    result_dir = os.path.dirname(RESULT_FILE)
-    print(f"  结果目录: {result_dir}")
-    if not os.path.exists(result_dir):
-        print(f"  创建结果目录: {result_dir}")
-        os.makedirs(result_dir, exist_ok=True)
-    
-    # 检查目录是否可写
-    if os.access(result_dir, os.W_OK):
-        print(f"  结果目录可写")
-    else:
-        print(f"  结果目录不可写，检查权限")
-    
-    # 保存Excel文件
-    print(f"  开始保存Excel文件...")
-    wb.save(RESULT_FILE)
-    print(f"  Excel文件保存成功")
-    
-    # 验证文件是否存在
-    if os.path.exists(RESULT_FILE):
-        print(f"  验证: Excel文件已存在")
-        print(f"  文件大小: {os.path.getsize(RESULT_FILE)} 字节")
-    else:
-        print(f"  验证: Excel文件不存在，保存失败")
-except Exception as e:
-    print(f"  保存Excel文件失败: {e}")
-    import traceback
-    traceback.print_exc()
-
-# 4. 生成微信通知内容
-print("- 生成微信通知内容...")
-
-# 准备微信通知内容
-notification_content = []
-notification_content.append("**测试结果**")
-notification_content.append("")
-notification_content.append(f"**权重文件**: {os.path.basename(weight_path)}")
-notification_content.append(f"**测试时间**: {pd.Timestamp.now().strftime('%Y-%m-%d %H:%M:%S')}")
-notification_content.append("")
-
-# 收集所有类别的结果
-for cls_id, stat in cls_stats.items():
-    cn_name = stat['cn_name']
-    recall = stat.get('recall', 0.0)
-    class_match_rate = stat.get('class_match_rate', 0.0)
-    precision = stat.get('precision', 0.0)
-    f1_score = stat.get('f1_score', 0.0)
-    
-    notification_content.append(f"**{cn_name}**: ")
-    notification_content.append(f"- 召回率: {recall:.4f}")
-    notification_content.append(f"- 类别匹配率: {class_match_rate:.4f}")
-    notification_content.append(f"- 精确率: {precision:.4f}")
-    notification_content.append(f"- F1分数: {f1_score:.4f}")
-    notification_content.append("")
-
-# 将通知内容保存到临时文件
-notification_temp_file = "/tmp/wechat_notification_content.txt"
-with open(notification_temp_file, 'w') as f:
-    f.write('\n'.join(notification_content))
-
-print(f"- 微信通知内容已生成，保存到临时文件: {notification_temp_file}")
-
-# 5. 保存Excel文件
-print(f"\n- 保存评估结果到: {RESULT_FILE}")
-try:
-    # 检查目录是否存在，不存在则创建
-    result_dir = os.path.dirname(RESULT_FILE)
-    print(f"  结果目录: {result_dir}")
-    if not os.path.exists(result_dir):
-        print(f"  创建结果目录: {result_dir}")
-        os.makedirs(result_dir, exist_ok=True)
-    
-    # 检查目录是否可写
-    if os.access(result_dir, os.W_OK):
-        print(f"  结果目录可写")
-    else:
-        print(f"  结果目录不可写，检查权限")
-    
-    # 保存Excel文件
-    print(f"  开始保存Excel文件...")
-    wb.save(RESULT_FILE)
-    print(f"  Excel文件保存成功")
-    
-    # 验证文件是否存在
-    if os.path.exists(RESULT_FILE):
-        print(f"  验证: Excel文件已存在")
-        print(f"  文件大小: {os.path.getsize(RESULT_FILE)} 字节")
-    else:
-        print(f"  验证: Excel文件不存在，保存失败")
-except Exception as e:
-    print(f"  保存Excel文件失败: {e}")
-    import traceback
-    traceback.print_exc()
-
-# 6. 保存标签文件（如果启用）
-print("- 检查是否需要保存标签文件...")
-
-# 读取标签保存配置
-try:
-    label_save_enable = config['test']['label_save']['enable']
-    label_save_root = config['test']['label_save']['save_root']
-    label_save_format = config['test']['label_save']['format']
-    
-    if label_save_enable == 1:
-        print(f"- 启用标签文件保存，保存根目录: {label_save_root}")
-        
-        # 创建保存根目录
-        os.makedirs(label_save_root, exist_ok=True)
-        
-        # 遍历每个权重文件
-        for weight_path in WEIGHTS_TO_TEST:
-            weight_name = os.path.basename(weight_path).replace('.pt', '')
-            
-            # 解析Epoch信息
-            if weight_name.startswith('epoch'):
-                epoch = weight_name.replace('epoch', '')
-            elif weight_name == 'best':
-                epoch = 'best'
-            elif weight_name == 'last':
-                epoch = 'last'
-            else:
-                epoch = weight_name
-            
-            # 获取权重输出目录
-            weight_output_dir = os.path.join(RESULT_OUTPUT_DIR, weight_name)
-            
-            if os.path.exists(weight_output_dir):
-                # 遍历所有数据集
-                datasets = DATASET_CONFIG['datasets']
-                for dataset in datasets:
-                    dataset_name = dataset['name']
-                    
-                    # 构建标签保存路径
-                    if label_save_format == 'epoch_based':
-                        # 按照 epoch0, epoch3, epoch6 格式
-                        label_save_dir = os.path.join(label_save_root, f"epoch{epoch}", dataset_name)
-                    else:
-                        # 默认格式
-                        label_save_dir = os.path.join(label_save_root, weight_name, dataset_name)
-                    
-                    # 创建保存目录
-                    os.makedirs(label_save_dir, exist_ok=True)
-                    
-                    # 查找该数据集的标签文件
-                    dataset_output_dir = os.path.join(weight_output_dir, dataset_name)
-                    labels_dir = os.path.join(dataset_output_dir, 'labels')
-                    
-                    if os.path.exists(labels_dir):
-                        # 复制所有标签文件到保存目录
-                        for file in os.listdir(labels_dir):
-                            if file.endswith('.txt'):
-                                src_path = os.path.join(labels_dir, file)
-                                dst_path = os.path.join(label_save_dir, file)
-                                try:
-                                    shutil.copy2(src_path, dst_path)
-                                    print(f"  保存标签文件: {dst_path}")
-                                except Exception as e:
-                                    print(f"  保存标签文件失败: {src_path}, 错误: {e}")
-                    else:
-                        # 标签目录不存在，尝试直接在数据集目录下查找txt文件
-                        print(f"  标签目录不存在: {labels_dir}")
-                        print(f"  尝试在数据集目录下查找txt文件: {dataset_output_dir}")
-                        if os.path.exists(dataset_output_dir):
-                            for file in os.listdir(dataset_output_dir):
-                                if file.endswith('.txt'):
-                                    src_path = os.path.join(dataset_output_dir, file)
-                                    dst_path = os.path.join(label_save_dir, file)
-                                    try:
-                                        shutil.copy2(src_path, dst_path)
-                                        print(f"  保存标签文件: {dst_path}")
-                                    except Exception as e:
-                                        print(f"  保存标签文件失败: {src_path}, 错误: {e}")
-                        
-                        # 尝试查找其他可能的标签文件位置
-                        print(f"  尝试查找其他可能的标签文件位置...")
-                        all_txt_files = []
-                        for root, dirs, files in os.walk(weight_output_dir):
-                            for file in files:
-                                if file.endswith('.txt'):
-                                    all_txt_files.append(os.path.join(root, file))
-                        
-                        if all_txt_files:
-                            print(f"  找到 {len(all_txt_files)} 个txt文件:")
-                            for file_path in all_txt_files[:5]:  # 只显示前5个
-                                print(f"    - {file_path}")
-                        else:
-                            print(f"  未找到任何txt文件")
-        
-        print("- 标签文件保存完成")
-    else:
-        print("- 标签文件保存未启用")
-except KeyError:
-    print("- 未找到标签保存配置，跳过保存")
-
-# 7. 对best.pt权重生成对比图（如果是best权重）
-print("- 检查是否需要生成对比图...")
-
-for weight_path in WEIGHTS_TO_TEST:
-    weight_name = os.path.basename(weight_path).replace('.pt', '')
-    
-    # 只对best权重生成对比图
-    if weight_name == 'best':
-        print("- 对best.pt权重生成对比图")
-        
-        # 获取YOLOv5目录
-        yolov5_dir = "/home/user/cv_project/corn-detection/yolov5-rknn-self"
-        
-        # 遍历所有测试数据集
-        datasets = DATASET_CONFIG['datasets']
-        for dataset in datasets:
-            dataset_name = dataset['name']
-            img_path = dataset['img_path']
-            img_subdir = dataset.get('img_subdir', 'images')
-            label_subdir = dataset.get('label_subdir', 'labels')
-            
-            # 构建完整的测试集路径
-            test_set_path = os.path.join(img_path, img_subdir)
-            
-            # 构建输出目录
-            output_dir = os.path.join(RESULT_OUTPUT_DIR, "visualization", "best", dataset_name)
-            os.makedirs(output_dir, exist_ok=True)
-            
-            # 检查测试集路径是否存在
-            if not os.path.exists(img_path):
-                print(f"- 测试集路径不存在: {img_path}")
-                continue
-            
-            # 检查images子目录是否存在
-            if not os.path.exists(os.path.join(img_path, img_subdir)):
-                print(f"- 图片目录不存在: {os.path.join(img_path, img_subdir)}")
-                continue
-            
-            # 检查labels子目录是否存在
-            if not os.path.exists(os.path.join(img_path, label_subdir)):
-                print(f"- 标签目录不存在: {os.path.join(img_path, label_subdir)}")
-                continue
-            
-            print(f"- 处理测试集: {dataset_name}")
-            print(f"- 图片目录: {os.path.join(img_path, img_subdir)}")
-            print(f"- 标签目录: {os.path.join(img_path, label_subdir)}")
-            
-            # 1. 读取类别信息
-            class_names = []
-            try:
-                classes = config['class_config']['classes']
-                for cls_id in sorted(classes.keys(), key=lambda x: int(x)):
-                    class_names.append(classes[cls_id]['name'])
-                print(f"- 类别信息: {class_names}")
-            except KeyError:
-                print("- 未找到类别配置，使用默认类别")
-                class_names = ['corn', 'tujian']
-            
-            # 2. 读取真实标签和预测标签
-            import os
-            import cv2
-            import numpy as np
-            
-            # 3. 生成对比图
-            # 遍历所有图片文件
-            image_extensions = ['.jpg', '.jpeg', '.png', '.bmp']
-            img_dir = os.path.join(img_path, img_subdir)
-            label_dir = os.path.join(img_path, label_subdir)
-            
-            # 构建预测标签目录路径
-            pred_label_dir = os.path.join(RESULT_OUTPUT_DIR, weight_name, dataset_name, 'labels')
-            
-            if not os.path.exists(pred_label_dir):
-                print(f"- 预测标签目录不存在: {pred_label_dir}")
-                continue
-            
-            # 读取预测图像目录
-            pred_img_dir = os.path.join(RESULT_OUTPUT_DIR, weight_name, dataset_name)
-            
-            # 计算IoU的函数
-            def calculate_bbox_iou(box1, box2):
-                box1_x1 = box1[0] - box1[2] / 2
-                box1_y1 = box1[1] - box1[3] / 2
-                box1_x2 = box1[0] + box1[2] / 2
-                box1_y2 = box1[1] + box1[3] / 2
-
-                box2_x1 = box2[0] - box2[2] / 2
-                box2_y1 = box2[1] - box2[3] / 2
-                box2_x2 = box2[0] + box2[2] / 2
-                box2_y2 = box2[1] + box2[3] / 2
-
-                x1 = max(box1_x1, box2_x1)
-                y1 = max(box1_y1, box2_y1)
-                x2 = min(box1_x2, box2_x2)
-                y2 = min(box1_y2, box2_y2)
-
-                intersection = max(0, x2 - x1) * max(0, y2 - y1)
-
-                box1_area = box1[2] * box1[3]
-                box2_area = box2[2] * box2[3]
-                union = box1_area + box2_area - intersection
-
-                iou = intersection / union if union > 0 else 0
-                return iou
-            
-            # 匹配标注的函数
-            def match_annotations(gt_annos, pred_annos, iou_threshold=0.5):
-                matched_pairs = []
-                unmatched_gt = []
-                unmatched_pred = list(range(len(pred_annos)))
-
-                for gt_idx, gt_anno in enumerate(gt_annos):
-                    best_iou = 0
-                    best_pred_idx = -1
-
-                    for pred_idx, pred_anno in enumerate(pred_annos):
-                        if pred_idx not in unmatched_pred:
-                            continue
-
-                        if gt_anno[0] != pred_anno[0]:
-                            continue
-
-                        iou = calculate_bbox_iou(gt_anno[1:5], pred_anno[1:5])
-
-                        if iou > best_iou and iou >= iou_threshold:
-                            best_iou = iou
-                            best_pred_idx = pred_idx
-
-                    if best_pred_idx != -1:
-                        matched_pairs.append({
-                            'gt_idx': gt_idx,
-                            'pred_idx': best_pred_idx,
-                            'iou': best_iou
-                        })
-                        unmatched_pred.remove(best_pred_idx)
-                    else:
-                        unmatched_gt.append(gt_idx)
-
-                return matched_pairs, unmatched_gt, unmatched_pred
-            
-            # 遍历所有标签文件
-            for label_file in os.listdir(label_dir):
-                if not label_file.endswith('.txt'):
-                    continue
-                
-                # 获取文件名（不含扩展名）
-                file_name = os.path.splitext(label_file)[0]
-                
-                # 查找对应的图像文件
-                img_file = None
-                for ext in image_extensions:
-                    potential_img = os.path.join(img_dir, f"{file_name}{ext}")
-                    if os.path.exists(potential_img):
-                        img_file = potential_img
-                        break
-                
-                if not img_file:
-                    print(f"- 未找到对应的图像文件: {file_name}")
-                    continue
-                
-                # 查找对应的预测标签文件
-                pred_label_file = os.path.join(pred_label_dir, label_file)
-                if not os.path.exists(pred_label_file):
-                    print(f"- 未找到对应的预测标签文件: {label_file}")
-                    continue
-                
-                # 查找对应的预测图像文件
-                pred_img_file = None
-                for ext in image_extensions:
-                    potential_pred_img = os.path.join(pred_img_dir, f"{file_name}{ext}")
-                    if os.path.exists(potential_pred_img):
-                        pred_img_file = potential_pred_img
-                        break
-                
-                if not pred_img_file:
-                    print(f"- 未找到对应的预测图像文件: {file_name}")
-                    continue
-                
-                # 读取真实标签
-                gt_annotations = []
-                with open(os.path.join(label_dir, label_file), 'r') as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) >= 5:
-                            class_id = int(parts[0])
-                            bbox = [float(x) for x in parts[1:5]]
-                            gt_annotations.append([class_id] + bbox)
-                
-                # 读取预测标签
-                pred_annotations = []
-                with open(pred_label_file, 'r') as f:
-                    for line in f:
-                        parts = line.strip().split()
-                        if len(parts) >= 5:
-                            class_id = int(parts[0])
-                            bbox = [float(x) for x in parts[1:5]]
-                            pred_annotations.append([class_id] + bbox)
-                
-                # 匹配标注，检查是否有漏检或误检
-                matched_pairs, unmatched_gt, unmatched_pred = match_annotations(gt_annotations, pred_annotations)
-                
-                # 只生成有问题的对比图（有漏检或误检）
-                if not unmatched_gt and not unmatched_pred:
-                    continue  # 没有问题，跳过
-                
-                # 生成颜色映射
-                def generate_color_map(class_count):
-                    base_colors = [
-                        (255, 0, 0),     # 红色
-                        (0, 255, 0),     # 绿色
-                        (0, 0, 255),     # 蓝色
-                        (255, 255, 0),   # 黄色
-                        (255, 0, 255),   # 品红
-                        (0, 255, 255),   # 青色
-                    ]
-                    color_map = {}
-                    for i in range(class_count):
-                        color_map[i] = base_colors[i % len(base_colors)]
-                    return color_map
-                
-                # 绘制边界框
-                def draw_bboxes(image, annotations, color_map):
-                    h, w = image.shape[:2]
-                    img_with_boxes = image.copy()
-                    
-                    for anno in annotations:
-                        class_id = anno[0]
-                        x_center, y_center, width, height = anno[1:5]
-                        
-                        # 转换为像素坐标
-                        x1 = int((x_center - width / 2) * w)
-                        y1 = int((y_center - height / 2) * h)
-                        x2 = int((x_center + width / 2) * w)
-                        y2 = int((y_center + height / 2) * h)
-                        
-                        # 确保坐标在图像范围内
-                        x1 = max(0, min(x1, w-1))
-                        y1 = max(0, min(y1, h-1))
-                        x2 = max(0, min(x2, w-1))
-                        y2 = max(0, min(y2, h-1))
-                        
-                        # 绘制边界框
-                        color = color_map.get(class_id, (0, 255, 0))
-                        cv2.rectangle(img_with_boxes, (x1, y1), (x2, y2), color, 2)
-                    
-                    return img_with_boxes
-                
-                # 统计标签数量
-                def count_labels(annotations):
-                    label_counts = {}
-                    for anno in annotations:
-                        class_id = anno[0]
-                        # 使用配置中的类别名称，确保映射正确
-                        class_name = class_names[class_id] if class_id < len(class_names) else f"Class_{class_id}"
-                        if class_name in label_counts:
-                            label_counts[class_name] += 1
-                        else:
-                            label_counts[class_name] = 1
-                    return label_counts
-                
-                # 绘制标签信息
-                def draw_label_info(image, label_counts, position=(20, 30), color=(255, 255, 255), color_map=None):
-                    font = cv2.FONT_HERSHEY_SIMPLEX
-                    font_scale = 0.8
-                    thickness = 2
-                    line_height = 30
-                    
-                    # 绘制背景矩形
-                    max_width = 0
-                    for label, count in label_counts.items():
-                        text = f"{label}: {count}"
-                        text_size = cv2.getTextSize(text, font, font_scale, thickness)[0]
-                        if text_size[0] > max_width:
-                            max_width = text_size[0]
-                    
-                    bg_height = line_height * (len(label_counts) + 1)
-                    bg_width = max_width + 40
-                    
-                    # 半透明黑色背景
-                    overlay = image.copy()
-                    cv2.rectangle(overlay, (position[0]-10, position[1]-20), 
-                                 (position[0]+bg_width, position[1]+bg_height), (0, 0, 0), -1)
-                    cv2.addWeighted(overlay, 0.7, image, 0.3, 0, image)
-                    
-                    # 绘制标签信息
-                    y = position[1]
-                    cv2.putText(image, "Labels:", (position[0], y), font, font_scale, color, thickness)
-                    y += line_height
-                    
-                    for label, count in label_counts.items():
-                        text = f"{label}: {count}"
-                        # 尝试获取标签对应的颜色
-                        label_color = color
-                        if class_names and color_map:
-                            # 查找标签对应的class_id
-                            for class_id, class_name in enumerate(class_names):
-                                if class_name == label:
-                                    label_color = color_map.get(class_id, color)
-                                    break
-                        cv2.putText(image, text, (position[0], y), font, font_scale, label_color, thickness)
-                        y += line_height
-                    
-                    return image
-                
-                # 保持宽高比调整图像大小
-                def resize_keep_aspect(image, target_size):
-                    h, w = image.shape[:2]
-                    target_w, target_h = target_size
-                    
-                    # 计算缩放比例
-                    scale = min(target_w / w, target_h / h)
-                    new_w = int(w * scale)
-                    new_h = int(h * scale)
-                    
-                    # 调整大小
-                    resized = cv2.resize(image, (new_w, new_h))
-                    
-                    # 创建目标尺寸的画布
-                    canvas = np.zeros((target_h, target_w, 3), dtype=np.uint8)
-                    
-                    # 将调整大小后的图像放在中央
-                    y_offset = (target_h - new_h) // 2
-                    x_offset = (target_w - new_w) // 2
-                    canvas[y_offset:y_offset+new_h, x_offset:x_offset+new_w] = resized
-                    
-                    return canvas
-                
-                # 创建对比可视化图像
-                def create_comparison_visualization(original_img_path, pred_img_path, gt_annotations, pred_annotations, output_path, class_names):
-                    if not os.path.exists(original_img_path):
-                        return False
-                    
-                    # 读取原始图像
-                    original_img = cv2.imread(original_img_path)
-                    if original_img is None:
-                        return False
-                    
-                    # 生成颜色映射
-                    all_class_ids = set()
-                    for anno in gt_annotations + pred_annotations:
-                        all_class_ids.add(anno[0])
-                    max_class_id = max(all_class_ids) if all_class_ids else 0
-                    color_map = generate_color_map(max_class_id + 1)
-                    
-                    # 统计标签数量
-                    gt_label_counts = count_labels(gt_annotations)
-                    pred_label_counts = count_labels(pred_annotations)
-                    
-                    # 绘制标签信息
-                    gt_img = original_img.copy()
-                    pred_img = original_img.copy()  # 使用原始图像，而不是YOLOv5生成的预测图像
-                    
-                    # 在原始图像上绘制真实标签边界框
-                    gt_img = draw_bboxes(gt_img, gt_annotations, color_map)
-                    
-                    # 在原始图像上绘制预测标签边界框
-                    pred_img = draw_bboxes(pred_img, pred_annotations, color_map)
-                    
-                    gt_img = draw_label_info(gt_img, gt_label_counts, color_map=color_map)
-                    pred_img = draw_label_info(pred_img, pred_label_counts, color_map=color_map)
-                    
-                    # 调整图像大小到1920x1080
-                    target_size = (1920, 1080)
-                    
-                    gt_img_resized = resize_keep_aspect(gt_img, target_size)
-                    pred_img_resized = resize_keep_aspect(pred_img, target_size)
-                    
-                    # 添加标题
-                    title_height = 50
-                    title_canvas = np.zeros((title_height, target_size[0], 3), dtype=np.uint8)
-                    
-                    # 真实标签标题
-                    cv2.putText(title_canvas, "Ground Truth (det)", 
-                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                    
-                    # 预测标签标题
-                    pred_title = np.zeros((title_height, target_size[0], 3), dtype=np.uint8)
-                    cv2.putText(pred_title, "YOLOv5 Predictions (det)", 
-                                (10, 30), cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                    
-                    # 最终拼接
-                    final_img = np.vstack([title_canvas, gt_img_resized, pred_title, pred_img_resized])
-                    
-                    # 保存结果
-                    cv2.imwrite(output_path, final_img)
-                    return True
-                
-                # 生成对比图
-                output_viz_path = os.path.join(output_dir, f"{file_name}_comparison.jpg")
-                success = create_comparison_visualization(
-                    img_file, pred_img_file, gt_annotations, pred_annotations, output_viz_path, class_names
-                )
-                
-                if success:
-                    print(f"- 生成对比图: {output_viz_path}")
-                else:
-                    print(f"- 生成对比图失败: {file_name}")
-            
-            # 检查输出目录是否有文件
-            files = os.listdir(output_dir)
-            if len(files) == 0:
-                print(f"- 警告: 输出目录为空: {output_dir}")
-            else:
-                print(f"- 输出目录包含 {len(files)} 个文件")
-                for file in files[:5]:  # 显示前5个文件
-                    print(f"  - {file}")
-        
-        break  # 只处理best权重
-
-# 8. 清理推理结果，保留xlsx文件、error_analysis目录和visualization目录
-print("- 清理推理结果...")
-
-# 只保留最终的结果文件、error_analysis目录和visualization目录，删除其他所有文件
-if os.path.exists(RESULT_OUTPUT_DIR):
-    for root, dirs, files in os.walk(RESULT_OUTPUT_DIR):
-        # 跳过error_analysis和visualization目录
-        if "error_analysis" in dirs:
-            dirs.remove("error_analysis")
-        if "visualization" in dirs:
-            dirs.remove("visualization")
-        
-        for file in files:
-            file_path = os.path.join(root, file)
-            if file_path != RESULT_FILE:
-                try:
-                    os.remove(file_path)
-                except Exception as e:
-                    print(f"  删除文件失败: {file_path}, 错误: {e}")
-    
-    # 删除空目录
-    for root, dirs, files in os.walk(RESULT_OUTPUT_DIR, topdown=False):
-        # 跳过error_analysis和visualization目录
-        if "error_analysis" in dirs:
-            dirs.remove("error_analysis")
-        if "visualization" in dirs:
-            dirs.remove("visualization")
-        
-        for dir_name in dirs:
-            dir_path = os.path.join(root, dir_name)
-            try:
-                if not os.listdir(dir_path):
-                    os.rmdir(dir_path)
-            except Exception as e:
-                print(f"  删除目录失败: {dir_path}, 错误: {e}")
-
-print("- 清理完成，保留xlsx文件、error_analysis目录和visualization目录")
-EOF
-    
-    if [ $? -eq 0 ]; then
-        log_success "评估结果已保存到: $RESULT_FILE"
-        log_success "推理结果已清理，只保留xlsx文件"
-        
-        # 检查临时文件是否存在，存在则删除
-        if [ -f /tmp/wechat_notification_content.txt ]; then
-            rm -f /tmp/wechat_notification_content.txt
-        fi
-    else
-        log_warning "评估结果保存或清理失败"
+    # 6. 检查权重列表
+    if [ ${#WEIGHTS_TO_TEST[@]} -eq 0 ]; then
+        log_warning "没有要测试的权重文件，退出"
+        exit 0
     fi
+
+    # 7. 根据不同情况执行测试
+    for WEIGHT_PATH in "${WEIGHTS_TO_TEST[@]}"; do
+        if [ ! -f "$WEIGHT_PATH" ]; then
+            log_warning "权重文件不存在: $WEIGHT_PATH，跳过"
+            continue
+        fi
+        
+        log_info "测试权重: $WEIGHT_PATH"
+        
+        # 为每个权重创建输出目录
+        WEIGHT_NAME=$(basename "$WEIGHT_PATH" .pt)
+        WEIGHT_OUTPUT_DIR="$RESULT_OUTPUT_DIR/$WEIGHT_NAME"
+        
+        # 检查并创建输出目录
+        log_info "检查输出目录: $WEIGHT_OUTPUT_DIR"
+        if [ ! -d "$WEIGHT_OUTPUT_DIR" ]; then
+            log_info "创建输出目录: $WEIGHT_OUTPUT_DIR"
+            mkdir -p "$WEIGHT_OUTPUT_DIR"
+            
+            # 检查目录是否创建成功
+            if [ $? -eq 0 ]; then
+                log_success "输出目录创建成功"
+                # 尝试设置权限
+                chmod -R 755 "$WEIGHT_OUTPUT_DIR" 2>/dev/null
+            else
+                log_error "无法创建输出目录，尝试使用临时目录"
+                # 使用临时目录作为备选
+                TEMP_OUTPUT_DIR=$(mktemp -d)
+                log_info "使用临时目录: $TEMP_OUTPUT_DIR"
+                WEIGHT_OUTPUT_DIR="$TEMP_OUTPUT_DIR"
+            fi
+        else
+            log_info "输出目录已存在"
+            # 尝试设置权限
+            chmod -R 755 "$WEIGHT_OUTPUT_DIR" 2>/dev/null
+            # 测试目录是否可写
+            TEST_FILE="$WEIGHT_OUTPUT_DIR/test_write.txt"
+            echo "test" > "$TEST_FILE" 2>/dev/null
+            if [ $? -ne 0 ]; then
+                log_error "输出目录不可写，尝试使用临时目录"
+                # 使用临时目录作为备选
+                TEMP_OUTPUT_DIR=$(mktemp -d)
+                log_info "使用临时目录: $TEMP_OUTPUT_DIR"
+                WEIGHT_OUTPUT_DIR="$TEMP_OUTPUT_DIR"
+            else
+                log_success "输出目录可写"
+                rm "$TEST_FILE" 2>/dev/null
+            fi
+        fi
+        
+        # 8. 调用测试执行脚本
+        log_info "调用测试执行脚本..."
+        # 将数据集配置写入临时文件，避免JSON引号转义问题
+        DATASET_CONFIG_FILE=$(mktemp)
+        echo "$DATASET_CONFIG" > "$DATASET_CONFIG_FILE"
+        
+        TEST_RUNNER_CMD="python3 \"$SCRIPT_DIR/test_runner.py\" \
+            --config \"$CONFIG_FILE\" \
+            --test_script \"$TEST_SCRIPT\" \
+            --all_args \"$ALL_ARGS\" \
+            --dataset_config_file \"$DATASET_CONFIG_FILE\" \
+            --weight_path \"$WEIGHT_PATH\" \
+            --weight_output_dir \"$WEIGHT_OUTPUT_DIR\" \
+            --zip_enable $ZIP_ENABLE \
+            --conda_env \"$CONDA_ENV\""
+        log_info "测试执行命令: $TEST_RUNNER_CMD"
+        eval "$TEST_RUNNER_CMD"
+        
+        if [ $? -ne 0 ]; then
+            log_error "测试执行失败，继续处理下一个权重"
+            continue
+        fi
+        
+        # 9. 调用评估器脚本
+        log_info "调用评估器脚本..."
+        EVALUATOR_CMD="python3 \"$SCRIPT_DIR/evaluator.py\" \
+            --config \"$CONFIG_FILE\" \
+            --dataset_config_file \"$DATASET_CONFIG_FILE\" \
+            --result_file \"$RESULT_FILE\" \
+            --result_output_dir \"$RESULT_OUTPUT_DIR\" \
+            --weight_output_dir \"$WEIGHT_OUTPUT_DIR\" \
+            --weight_path \"$WEIGHT_PATH\" \
+            --all_args \"$ALL_ARGS\" \
+            --conf_thres $(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['core_params']['conf_thres'])")"
+        log_info "评估器命令: $EVALUATOR_CMD"
+        eval "$EVALUATOR_CMD"
+        
+        if [ $? -ne 0 ]; then
+            log_error "评估失败，继续处理下一个权重"
+            continue
+        fi
+        
+        # 10. 调用可视化脚本（仅针对best权重）
+        if [ "$WEIGHT_NAME" = "best" ]; then
+            log_info "调用可视化脚本..."
+            VISUALIZER_CMD="python3 \"$SCRIPT_DIR/visualizer.py\" \
+                --config \"$CONFIG_FILE\" \
+                --dataset_config_file \"$DATASET_CONFIG_FILE\" \
+                --result_output_dir \"$RESULT_OUTPUT_DIR\" \
+                --weight_output_dir \"$WEIGHT_OUTPUT_DIR\" \
+                --weight_path \"$WEIGHT_PATH\" \
+                --all_args \"$ALL_ARGS\" \
+                --conf_thres $(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['core_params']['conf_thres'])")"
+            log_info "可视化命令: $VISUALIZER_CMD"
+            eval "$VISUALIZER_CMD"
+            
+            if [ $? -ne 0 ]; then
+                log_warning "可视化生成失败"
+            fi
+        fi
+        
+        log_success "权重 $WEIGHT_PATH 处理完成"
+    done
+    
+    # 11. 清理推理结果（保留重要内容）
+    log_info "清理推理结果..."
+    if [ -d "$RESULT_OUTPUT_DIR" ]; then
+        # 遍历RESULT_OUTPUT_DIR下的所有目录
+        for dir_item in "$RESULT_OUTPUT_DIR"/*/; do
+            # 去除末尾斜杠
+            dir_item=${dir_item%/}
+            dir_name=$(basename "$dir_item")
+            
+            # 跳过visualization和error_analysis目录，不清理它们
+            if [ "$dir_name" = "visualization" ] || [ "$dir_name" = "error_analysis" ]; then
+                log_info "跳过目录（保留）: $dir_item"
+                continue
+            fi
+            
+            # 处理权重目录
+            log_info "清理权重目录: $dir_item"
+            
+            if [ -d "$dir_item" ]; then
+                # 进入权重目录
+                pushd "$dir_item" > /dev/null
+                
+                # 遍历权重目录下的所有项目
+                for item in *; do
+                    item_path="$dir_item/$item"
+                    
+                    # 保留图片和Excel文件
+                    if [[ "$item" == *".jpg" ]] || [[ "$item" == *".png" ]] || [[ "$item" == *".xlsx" ]]; then
+                        continue
+                    fi
+                    
+                    # 如果是目录（如part29、part30等），进入并清理内部内容
+                    if [ -d "$item_path" ]; then
+                        pushd "$item_path" > /dev/null
+                        
+                        # 在part目录内清理，只保留labels目录
+                        for inner_item in *; do
+                            if [ "$inner_item" = "labels" ]; then
+                                # 保留labels目录
+                                continue
+                            else
+                                # 删除其他内容（如images、crops等）
+                                rm -rf "$inner_item"
+                                log_info "  删除: $dir_name/$item/$inner_item"
+                            fi
+                        done
+                        
+                        popd > /dev/null
+                    else
+                        # 删除其他文件
+                        rm -rf "$item_path"
+                        log_info "  删除: $dir_name/$item"
+                    fi
+                done
+                
+                # 返回上一级目录
+                popd > /dev/null
             fi
         done
-    else
-        log_info "跳过最终测试（未开启）"
     fi
+    log_success "清理完成，保留xlsx文件、error_analysis目录、visualization目录和labels目录"
     
     log_success "测试评估执行完成"
+    return 0
 }
 
 # 执行主函数

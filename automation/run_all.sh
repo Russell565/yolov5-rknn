@@ -3,8 +3,42 @@
 # 自动化训练/测试主脚本
 # 用于解析配置文件并调用各个功能模块
 
-# 配置文件路径
-CONFIG_FILE="$(dirname "$0")/config.yaml"
+# 配置文件路径（支持命令行参数传入，默认使用config.yaml）
+# 使用方式: ./run_all.sh [配置文件路径]
+# 示例: ./run_all.sh config.yaml
+#       ./run_all.sh config_se.yaml
+#       ./run_all.sh /path/to/custom_config.yaml
+show_help() {
+    echo "使用方式: $0 [配置文件路径]"
+    echo ""
+    echo "参数:"
+    echo "  配置文件路径    指定配置文件（可选，默认使用 config.yaml）"
+    echo ""
+    echo "示例:"
+    echo "  $0                        # 使用默认配置文件 config.yaml"
+    echo "  $0 config.yaml            # 使用 config.yaml"
+    echo "  $0 config_se.yaml         # 使用 config_se.yaml"
+    echo "  $0 /path/to/custom.yaml   # 使用自定义配置文件"
+    echo ""
+    echo "如果配置文件路径是相对路径，会自动转换为绝对路径。"
+}
+
+# 检查是否请求帮助
+if [ "$1" = "-h" ] || [ "$1" = "--help" ]; then
+    show_help
+    exit 0
+fi
+
+# 确定配置文件路径
+if [ -n "$1" ]; then
+    CONFIG_FILE="$1"
+    # 如果传入的是相对路径，转换为绝对路径
+    if [[ ! "$CONFIG_FILE" =~ ^/ ]]; then
+        CONFIG_FILE="$(cd "$(dirname "$0")" && pwd)/$CONFIG_FILE"
+    fi
+else
+    CONFIG_FILE="$(cd "$(dirname "$0")" && pwd)/config.yaml"
+fi
 
 # 颜色定义
 RED='\033[0;31m'
@@ -30,6 +64,9 @@ log_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
+# 输出当前使用的配置文件路径
+log_info "当前读取配置文件: $CONFIG_FILE"
+
 # 检查配置文件是否存在
 if [ ! -f "$CONFIG_FILE" ]; then
     log_error "配置文件不存在: $CONFIG_FILE"
@@ -39,13 +76,21 @@ fi
 # 获取当前目录
 CURRENT_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# 读取直接测试配置
+DIRECT_TEST_OPEN=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['test']['direct_test']['open'])")
+
 # 清理旧进程和临时文件
-log_info "清理旧进程和临时文件..."
-bash "$CURRENT_DIR/kill_all.sh"
-if [ $? -eq 0 ]; then
-    log_success "环境清理完成"
+# 只有在非直接测试模式下才执行kill脚本
+if [ "$DIRECT_TEST_OPEN" -ne 1 ]; then
+    log_info "清理旧进程和临时文件..."
+    bash "$CURRENT_DIR/kill_all.sh"
+    if [ $? -eq 0 ]; then
+        log_success "环境清理完成"
+    else
+        log_warning "环境清理时出现警告，但继续执行"
+    fi
 else
-    log_warning "环境清理时出现警告，但继续执行"
+    log_info "直接测试模式开启，跳过环境清理"
 fi
 
 # 加载微信推送函数
@@ -257,7 +302,7 @@ main() {
     
     # 7. 压缩output_root目录（如果配置了）
     OUTPUT_ROOT_COMPRESS=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base'].get('output_root_compress', 0))" 2>/dev/null || echo 0)
-    if [ "$OUTPUT_ROOT_COMPRESS" -eq 1 ]; then
+    if [ "$OUTPUT_ROOT_COMPRESS" -eq 1 ] && [ "$DIRECT_TEST_OPEN" -ne 1 ]; then
         log_info "执行output_root目录压缩任务..."
         OUTPUT_ROOT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base']['output_root'])")
         if [ -d "$OUTPUT_ROOT" ]; then
@@ -286,90 +331,99 @@ main() {
             log_warning "output_root目录不存在: $OUTPUT_ROOT"
         fi
     else
-        log_info "跳过目录压缩任务（未开启）"
+        if [ "$DIRECT_TEST_OPEN" -eq 1 ]; then
+            log_info "直接测试模式开启，跳过目录压缩任务"
+        else
+            log_info "跳过目录压缩任务（未开启）"
+        fi
     fi
     
     # 8. 移动output_root目录内容到project/name目录
-    log_info "执行目录内容移动任务..."
-    OUTPUT_ROOT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base']['output_root'])")
-    PROJECT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['project'])")
-    NAME=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['name'])")
-    TARGET_DIR="$PROJECT/$NAME"
-    
-    log_info "输出根目录: $OUTPUT_ROOT"
-    log_info "项目目录: $PROJECT"
-    log_info "模型名称: $NAME"
-    log_info "目标目录: $TARGET_DIR"
-    
-    # 检查目录是否存在
-    if [ -d "$OUTPUT_ROOT" ]; then
-        log_info "源目录存在: $OUTPUT_ROOT"
-        # 列出源目录内容
-        log_info "源目录内容:" 
-        ls -la "$OUTPUT_ROOT"
-    else
-        log_warning "源目录不存在: $OUTPUT_ROOT"
-    fi
-    
-    if [ -d "$TARGET_DIR" ]; then
-        log_info "目标目录存在: $TARGET_DIR"
-        # 列出目标目录内容
-        log_info "目标目录内容:" 
-        ls -la "$TARGET_DIR"
-    else
-        log_warning "目标目录不存在: $TARGET_DIR"
-        # 尝试创建目标目录
-        log_info "尝试创建目标目录..."
-        mkdir -p "$TARGET_DIR"
-        if [ $? -eq 0 ]; then
-            log_success "目标目录已创建: $TARGET_DIR"
+    # 只有在非直接测试模式下才执行拷贝操作
+    if [ "$DIRECT_TEST_OPEN" -ne 1 ]; then
+        log_info "执行目录内容移动任务..."
+        OUTPUT_ROOT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['base']['output_root'])")
+        PROJECT=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['project'])")
+        NAME=$(python3 -c "import yaml; config=yaml.safe_load(open('$CONFIG_FILE')); print(config['train']['core_params']['name'])")
+        TARGET_DIR="$PROJECT/$NAME"
+        
+        log_info "输出根目录: $OUTPUT_ROOT"
+        log_info "项目目录: $PROJECT"
+        log_info "模型名称: $NAME"
+        log_info "目标目录: $TARGET_DIR"
+        
+        # 检查目录是否存在
+        if [ -d "$OUTPUT_ROOT" ]; then
+            log_info "源目录存在: $OUTPUT_ROOT"
+            # 列出源目录内容
+            log_info "源目录内容:" 
+            ls -la "$OUTPUT_ROOT"
         else
-            log_error "无法创建目标目录: $TARGET_DIR"
+            log_warning "源目录不存在: $OUTPUT_ROOT"
         fi
-    fi
-    
-    # 执行复制操作
-    if [ -d "$OUTPUT_ROOT" ] && [ -d "$TARGET_DIR" ]; then
-        log_info "开始复制目录内容..."
         
-        # 尝试使用cp命令复制
-        log_info "使用cp命令复制..."
-        cp -r "$OUTPUT_ROOT"/* "$TARGET_DIR/"
-        
-        if [ $? -eq 0 ]; then
-            log_success "目录内容复制完成: $OUTPUT_ROOT -> $TARGET_DIR"
+        if [ -d "$TARGET_DIR" ]; then
+            log_info "目标目录存在: $TARGET_DIR"
+            # 列出目标目录内容
+            log_info "目标目录内容:" 
+            ls -la "$TARGET_DIR"
         else
-            log_warning "cp命令复制失败，尝试使用rsync..."
-            # 尝试使用rsync命令复制
-            rsync -av "$OUTPUT_ROOT/" "$TARGET_DIR/"
-            
+            log_warning "目标目录不存在: $TARGET_DIR"
+            # 尝试创建目标目录
+            log_info "尝试创建目标目录..."
+            mkdir -p "$TARGET_DIR"
             if [ $? -eq 0 ]; then
-                log_success "目录内容复制完成（使用rsync）: $OUTPUT_ROOT -> $TARGET_DIR"
+                log_success "目标目录已创建: $TARGET_DIR"
             else
-                log_warning "rsync命令复制失败，尝试使用find命令..."
-                # 尝试使用find命令复制文件
-                find "$OUTPUT_ROOT" -type f -exec cp {} "$TARGET_DIR/" \;
-                
-                if [ $? -eq 0 ]; then
-                    log_success "目录内容复制完成（使用find）: $OUTPUT_ROOT -> $TARGET_DIR"
-                else
-                    log_error "所有复制尝试都失败了"
-                fi
+                log_error "无法创建目标目录: $TARGET_DIR"
             fi
         fi
         
-        # 验证复制结果
-        log_info "验证复制结果..."
-        SOURCE_FILES=$(find "$OUTPUT_ROOT" -type f | wc -l)
-        TARGET_FILES=$(find "$TARGET_DIR" -type f | wc -l)
-        log_info "源目录文件数: $SOURCE_FILES"
-        log_info "目标目录文件数: $TARGET_FILES"
-        
-        # 列出复制后的目标目录内容
-        log_info "复制后目标目录内容:" 
-        ls -la "$TARGET_DIR"
+        # 执行复制操作
+        if [ -d "$OUTPUT_ROOT" ] && [ -d "$TARGET_DIR" ]; then
+            log_info "开始复制目录内容..."
+            
+            # 尝试使用cp命令复制
+            log_info "使用cp命令复制..."
+            cp -r "$OUTPUT_ROOT"/* "$TARGET_DIR/"
+            
+            if [ $? -eq 0 ]; then
+                log_success "目录内容复制完成: $OUTPUT_ROOT -> $TARGET_DIR"
+            else
+                log_warning "cp命令复制失败，尝试使用rsync..."
+                # 尝试使用rsync命令复制
+                rsync -av "$OUTPUT_ROOT/" "$TARGET_DIR/"
+                
+                if [ $? -eq 0 ]; then
+                    log_success "目录内容复制完成（使用rsync）: $OUTPUT_ROOT -> $TARGET_DIR"
+                else
+                    log_warning "rsync命令复制失败，尝试使用find命令..."
+                    # 尝试使用find命令复制文件
+                    find "$OUTPUT_ROOT" -type f -exec cp {} "$TARGET_DIR/" \;
+                    
+                    if [ $? -eq 0 ]; then
+                        log_success "目录内容复制完成（使用find）: $OUTPUT_ROOT -> $TARGET_DIR"
+                    else
+                        log_error "所有复制尝试都失败了"
+                    fi
+                fi
+            fi
+            
+            # 验证复制结果
+            log_info "验证复制结果..."
+            SOURCE_FILES=$(find "$OUTPUT_ROOT" -type f | wc -l)
+            TARGET_FILES=$(find "$TARGET_DIR" -type f | wc -l)
+            log_info "源目录文件数: $SOURCE_FILES"
+            log_info "目标目录文件数: $TARGET_FILES"
+            
+            # 列出复制后的目标目录内容
+            log_info "复制后目标目录内容:" 
+            ls -la "$TARGET_DIR"
+        else
+            log_error "源目录或目标目录不存在，无法执行复制操作"
+        fi
     else
-        log_error "源目录或目标目录不存在，无法执行复制操作"
+        log_info "直接测试模式开启，跳过目录内容移动任务"
     fi
 }
 

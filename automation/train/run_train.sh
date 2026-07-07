@@ -133,14 +133,19 @@ import yaml
 # 加载配置
 config = yaml.safe_load(open('$CONFIG_FILE'))
 
-# 定义参数转换函数
 def params_to_args(params):
     args = []
     if params is not None:
         for k, v in params.items():
-            # 处理参数名，替换下划线为短横线
             arg_name = k.replace('_', '-')
-            args.append('--{0} {1}'.format(arg_name, v))
+            # 处理store_true类型参数
+            if v == 'store_true':
+                args.append('--{0}'.format(arg_name))
+            elif isinstance(v, bool):
+                # 普通布尔参数：始终传递值
+                args.append('--{0} {1}'.format(arg_name, str(v).lower()))
+            else:
+                args.append('--{0} {1}'.format(arg_name, v))
     return ' '.join(args)
 
 # 获取核心参数和扩展参数
