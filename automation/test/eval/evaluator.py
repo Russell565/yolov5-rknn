@@ -116,11 +116,24 @@ def count_ground_truth(datasets, cls_stats, pixel_filter):
                         line = line.strip()
                         if line:
                             parts = line.split()
-                            if len(parts) > 0:
+                            if len(parts) >= 5:
                                 try:
                                     cls_id = parts[0]
+                                    if cls_id.replace('.', '').isdigit():
+                                        cls_id = str(int(float(cls_id)))
                                     if cls_id in cls_stats:
-                                        annotation = [cls_id] + parts[1:]
+                                        if len(parts) == 5:
+                                            coords = [float(x) for x in parts[1:]]
+                                        elif len(parts) == 6:
+                                            coords = [float(x) for x in parts[1:5]]
+                                        elif len(parts) >= 7:
+                                            if len(parts) % 2 == 0:
+                                                coords = [float(x) for x in parts[1:-1]]
+                                            else:
+                                                coords = [float(x) for x in parts[1:]]
+                                        else:
+                                            coords = []
+                                        annotation = [cls_id] + coords + [1.0]
                                         filtered_annotations = filter_annotations_by_pixel_range(
                                             [annotation], pixel_filter
                                         )
@@ -181,26 +194,43 @@ def count_predictions(datasets, weight_output_dir, cls_stats, pixel_filter, conf
                         line = line.strip()
                         if line:
                             parts = line.split()
-                            if len(parts) > 0:
+                            if len(parts) >= 5:
                                 try:
                                     cls_id = parts[0]
-                                    conf = 0.0
-                                    if len(parts) > 1:
+                                    if cls_id.replace('.', '').isdigit():
+                                        cls_id = str(int(float(cls_id)))
+                                    
+                                    if len(parts) == 5:
+                                        coords = [float(x) for x in parts[1:]]
+                                        conf = 1.0
+                                    elif len(parts) == 6:
+                                        coords = [float(x) for x in parts[1:5]]
                                         try:
-                                            conf = float(parts[-1])
+                                            conf = float(parts[5])
                                         except ValueError:
-                                            continue
+                                            conf = 1.0
+                                    elif len(parts) >= 7:
+                                        if len(parts) % 2 == 0:
+                                            coords = [float(x) for x in parts[1:-1]]
+                                            try:
+                                                conf = float(parts[-1])
+                                            except ValueError:
+                                                conf = 1.0
+                                        else:
+                                            coords = [float(x) for x in parts[1:]]
+                                            conf = 1.0
+                                    else:
+                                        coords = []
+                                        conf = 1.0
                                     
                                     if conf < conf_thres:
                                         continue
                                     
-                                    annotation = [cls_id] + parts[1:-1]
+                                    annotation = [cls_id] + coords + [conf]
                                     filtered_annotations = filter_annotations_by_pixel_range(
                                         [annotation], pixel_filter
                                     )
                                     if filtered_annotations:
-                                        if cls_id.replace('.', '').isdigit():
-                                            cls_id = str(int(float(cls_id)))
                                         if cls_id in cls_stats:
                                             cls_stats[cls_id]['pred_count'] += 1
                                             total_pred_count += 1
@@ -340,8 +370,20 @@ def perform_iou_matching(datasets, all_labels_dirs, cls_stats, pixel_filter, iou
                                     cls_id = parts[0]
                                     if cls_id.replace('.', '').isdigit():
                                         cls_id = str(int(float(cls_id)))
-                                    coords = [float(x) for x in parts[1:]]
-                                    gt_annotations.append([cls_id] + coords)
+                                    
+                                    if len(parts) == 5:
+                                        coords = [float(x) for x in parts[1:]]
+                                    elif len(parts) == 6:
+                                        coords = [float(x) for x in parts[1:5]]
+                                    elif len(parts) >= 7:
+                                        if len(parts) % 2 == 0:
+                                            coords = [float(x) for x in parts[1:-1]]
+                                        else:
+                                            coords = [float(x) for x in parts[1:]]
+                                    else:
+                                        coords = []
+                                    
+                                    gt_annotations.append([cls_id] + coords + [1.0])
                                 except Exception:
                                     continue
                 except Exception as e:
@@ -365,8 +407,20 @@ def perform_iou_matching(datasets, all_labels_dirs, cls_stats, pixel_filter, iou
                                             cls_id = parts[0]
                                             if cls_id.replace('.', '').isdigit():
                                                 cls_id = str(int(float(cls_id)))
-                                            coords = [float(x) for x in parts[1:]]
-                                            gt_annotations.append([cls_id] + coords)
+                                            
+                                            if len(parts) == 5:
+                                                coords = [float(x) for x in parts[1:]]
+                                            elif len(parts) == 6:
+                                                coords = [float(x) for x in parts[1:5]]
+                                            elif len(parts) >= 7:
+                                                if len(parts) % 2 == 0:
+                                                    coords = [float(x) for x in parts[1:-1]]
+                                                else:
+                                                    coords = [float(x) for x in parts[1:]]
+                                            else:
+                                                coords = []
+                                            
+                                            gt_annotations.append([cls_id] + coords + [1.0])
                                         except Exception:
                                             continue
                         except Exception as e:
