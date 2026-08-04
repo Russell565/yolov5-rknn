@@ -119,14 +119,13 @@ test:
     weights: [
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260525白鲜糯玉米检测模型/weights/best.pt
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260417鲜黄白玉米检测模型/weights/best.pt
-      # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260522鲜彩糯玉米检测模型/weights/best.pt
+      /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260522鲜彩糯玉米检测模型/weights/best.pt
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260703黄鲜玉米检测模型_se对照组/weights/best.pt
 
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260427黄鲜玉米检测模型/weights/best.pt
 
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260422白冻糯玉米检测模型/weights/best.pt  # 模型权重路径
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260429花糯冻玉米检测模型/weights/best.pt  # 模型权重路径
-      /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260625黄鲜玉米检测模型_se/weights/best.pt  # 模型权重路径
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260511黄白冻玉米检测模型/weights/best.pt  # 模型权重路径
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260420鲜紫黑玉米检测模型/weights/best.pt  # 模型权重路径
 
@@ -142,10 +141,6 @@ test:
   dataset_config:
     open: 1                 # 是否启用测试数据集配置
     datasets:               # 测试数据集列表
-    - name: huang # 数据集名称
-      img_path: /data/test_data/corn/test_dataset/现场数据/20260724-鲜-黄-麦秀年-619-d40960f177b7d760 # 父目录
-      img_subdir: images   # 图片子目录名
-      label_subdir: labels  # 标签子目录名
     # 黄白测试集
     # - name: huangbai # 数据集名称
     #   img_path: /data/test_data/corn/test_dataset/huangbai/xian/det/20260624_huangbai_xian # 父目录
@@ -341,10 +336,10 @@ test:
     #   label_subdir: labels  # 标签子目录名
 
     # 花糯冻测试集
-    # - name: part1   # 数据集名称
-    #   img_path: /data/test_data/corn/test_dataset/huanuo/dong/det/20251218_huanuo_corn_det_part1 # 父目录
-    #   img_subdir: images   # 图片子目录名
-    #   label_subdir: labels  # 标签子目录名
+    - name: part1   # 数据集名称
+      img_path: /data/test_data/corn/test_dataset/huanuo/dong/det/20251218_huanuo_corn_det_part1 # 父目录
+      img_subdir: images   # 图片子目录名
+      label_subdir: labels  # 标签子目录名
     # - name: part15  # 数据集名称
     #   img_path: /data/test_data/corn/test_dataset/huanuo/dong/det/20251218_huanuo_corn_det_part15 # 父目录
     #   img_subdir: images   # 图片子目录名
@@ -440,6 +435,11 @@ test:
     #   img_subdir: images   # 图片子目录名
     #   label_subdir: labels  # 标签子目录名
 
+    # - name: 外轮廓  # 数据集名称
+    #   img_path: /data/test_data/corn/test_dataset/外轮廓/huanuo-xian/20260707_huanuo_xian_normal_results  # 父目录
+    #   img_subdir: images   # 图片子目录名
+    #   label_subdir: labels_object_seg  # 标签子目录名
+
     zip: 0                  # 测试结果是否压缩（1-压缩，0-不压缩）
 
     # 像素过滤配置
@@ -459,8 +459,8 @@ test:
     # output_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260427黄鲜玉米检测模型/20260527_xian_bai_test_results/test_results  # 测试输出目录
     # file_path: /data/test_result/xian/det/20260622_huang_corn_det_test/20260622_huang_corn_det_test.xlsx  # 结果文件路径
     # output_dir: /data/test_result/xian/det/20260622_huang_corn_det_test  # 测试输出目录
-    file_path: /data/test_result/xian/det/huang/20260725_huang_corn_det_test/20260725_huang_corn_det_test.xlsx  # 结果文件路径
-    output_dir: /data/test_result/xian/det/huang/20260725_huang_corn_det_test  # 测试输出目录
+    file_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/automation/temp/0708/20260708_huanuo_corn_det_test.xlsx  # 结果文件路径
+    output_dir: /home/user/cv_project/corn-detection/yolov5-rknn-self/automation/temp/0708  # 测试输出目录
     # file_path: /data/test_result/xian/seg/wailunkuo/20260707_all_contour_corn_seg_test/20260707_all_contour_corn_seg_test.xlsx  # 结果文件路径
     # output_dir: /data/test_result/xian/seg/wailunkuo/20260707_all_contour_corn_seg_test  # 测试输出目录
 
@@ -472,7 +472,7 @@ test:
   label_save:
     enable: 0              # 是否启用保存标签文件
     # save_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260422白冻糯玉米检测模型//20260524_xian_huanuo_test_results/labels  # 标签文件保存根目录
-    save_root: /data/test_result/xian/det/20260630_huang_corn_det_test/labels  # 标签文件保存根目录
+    save_root: /home/user/cv_project/corn-detection/yolov5-rknn-self/automation/temp/0708/labels  # 标签文件保存根目录
     format: epoch_based      # 保存格式，epoch_based表示按epoch分组
 
 # 类别配置

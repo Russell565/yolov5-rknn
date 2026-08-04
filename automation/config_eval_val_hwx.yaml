@@ -30,7 +30,7 @@ train:
 
   # 核心训练参数
   core_params:
-    # object-det: 0            # 项目特定参数
+    # object-seg: 0            # 项目特定参数
     project: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train  # 训练结果保存目录
     name: 20260507黄鲜玉米检测模型测试se  # 本次训练模型名称
     hyp: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/hyps/hyp.corn_grading_det_finetune.yaml  # 超参数文件路径
@@ -89,7 +89,7 @@ test:
   conda_env: rknn    # 测试专用conda环境（可选）
   det_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/detect.py  # 检测测试脚本
   seg_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/segment/predict.py  # 分割测试脚本
-  mode: det                 # det或seg，可独立配置
+  mode: seg                 # det或seg，可独立配置
 
   # 核心测试参数
   core_params:
@@ -117,7 +117,9 @@ test:
   direct_test:
     open: 1                 # 是否开启直接测试模式（不训练，只测试）
     weights: [
-      /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260427黄鲜玉米检测模型/weights/best.pt
+      /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20260728鲜白玉米缺陷分割模型/weights/best.pt
+      # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260522鲜彩糯玉米检测模型/weights/best.pt
+      # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260427黄鲜玉米检测模型/weights/best.pt
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260515黄鲜玉米检测模型_se/weights/best.pt
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260526黄鲜玉米检测模型_se/weights/best.pt
       # /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260603_2白鲜糯玉米检测模型/weights/best.pt
@@ -133,12 +135,18 @@ test:
   dataset_config:
     open: 1                 # 是否启用测试数据集配置
     datasets:               # 测试数据集列表
-    
+
+
+      - name: 20260729-鲜-白-风水梁-336-相机2  # 数据集名称
+        img_path: /data/test_data/corn/20260729-鲜-白-风水梁-336-相机2
+        img_subdir: images
+        label_subdir: labels_seg
+
       # 黄鲜
-      - name: part31  # 数据集名称
-        img_path: /data/test_data/corn/test_dataset/huang/xian/det/20260104_huang_corn_grading_det_part31  # 父目录
-        img_subdir: images   # 图片子目录名
-        label_subdir: labels  # 标签子目录名
+      # - name: 带皮玉米  # 数据集名称
+      #   img_path: /data/test_data/corn/带皮玉米
+      #   img_subdir: images
+      #   label_subdir: labels
       # - name: part32  # 数据集名称
       #   img_path: /data/test_data/corn/test_dataset/huang/xian/det/20260104_huang_corn_grading_det_part32 # 父目录
       #   img_subdir: images   # 图片子目录名
@@ -259,10 +267,6 @@ test:
       #   img_path: /data/test_data/corn/test_dataset/空背景/实验室4种托盘  # 父目录
       #   img_subdir: images   # 图片子目录名
       #   label_subdir: labels  # 标签子目录名
-      # - name: 鲜玉米现场托盘  # 数据集名称
-      #   img_path: /data/test_data/corn/test_dataset/空背景/鲜玉米现场托盘  # 父目录
-      #   img_subdir: images   # 图片子目录名
-      #   label_subdir: labels  # 标签子目录名
     zip: 0                  # 测试结果是否压缩（1-压缩，0-不压缩）
 
     # 像素过滤配置
@@ -276,8 +280,8 @@ test:
   # 结果保存配置
   result:
     format: xlsx            # 结果格式
-    file_path: /data/test_result/0707/黄鲜/metrics-xian-bai-det-test.xlsx  # 结果文件路径
-    output_dir: /data/test_result/0707/黄鲜/test_results  # 测试输出目录
+    file_path: /data/test_data/corn/20260729-鲜-白-风水梁-336-相机2/metrics-det-test.xlsx  # 结果文件路径
+    output_dir: /data/test_data/corn/20260729-鲜-白-风水梁-336-相机2/test_results  # 测试输出目录
 
     # 对比图输出模式配置
     comparison_output_mode: all  # bad_only-只输出错误对比图, all-输出所有对比图, correct_only-只输出正确对比图
@@ -285,55 +289,54 @@ test:
   # 标签文件保存配置
   label_save:
     enable: 1               # 是否启用保存标签文件
-    save_root: /data/test_result/0707/黄鲜/labels  # 标签文件保存根目录
+    save_root: /data/test_data/corn/20260729-鲜-白-风水梁-336-相机2/labels2  # 标签文件保存根目录
     format: epoch_based      # 保存格式，epoch_based表示按epoch分组
 
 # 类别配置
 class_config:
-  type: det                 # 类别类型
+  type: seg                 # 类别类型
+  classes:                  # 类别对照表
+    # 0:
+    #   id: 0
+    #   name: corn
+    #   cn_name: 玉米
+    # 1:
+    #   id: 1
+    #   name: tujian
+    #   cn_name: 秃尖
   classes:                  # 类别对照表
     0:
       id: 0
-      name: corn
-      cn_name: 玉米
+      name: queli
+      cn_name: 缺粒
     1:
       id: 1
-      name: tujian
-      cn_name: 秃尖
-  # type: det                 # 类别类型
-  # classes:                  # 类别对照表
-  #   0:
-  #     id: 0
-  #     name: queli
-  #     cn_name: 缺粒
-  #   1:
-  #     id: 1
-  #     name: huaili
-  #     cn_name: 坏粒
-  #   2:
-  #     id: 2
-  #     name: bieli
-  #     cn_name: 瘪粒
-  #   3:
-  #     id: 3
-  #     name: hua
-  #     cn_name: 花粒
-  #   4:
-  #     id: 4
-  #     name: meichong
-  #     cn_name: 霉虫
-  #   5:
-  #     id: 5
-  #     name: duanlie
-  #     cn_name: 断裂
-  #   6:
-  #     id: 6
-  #     name: jiya
-  #     cn_name: 挤压
-  #   7:
-  #     id: 7
-  #     name: ranse
-  #     cn_name: 染色
+      name: huaili
+      cn_name: 坏粒
+    2:
+      id: 2
+      name: bieli
+      cn_name: 瘪粒
+    3:
+      id: 3
+      name: hua
+      cn_name: 花粒
+    4:
+      id: 4
+      name: meichong
+      cn_name: 霉虫
+    5:
+      id: 5
+      name: duanlie
+      cn_name: 断裂
+    6:
+      id: 6
+      name: jiya
+      cn_name: 挤压
+    7:
+      id: 7
+      name: ranse
+      cn_name: 染色
 
 
 # SFTP推送配置
