@@ -915,3 +915,60 @@ class Classify(nn.Module):
         if isinstance(x, list):
             x = torch.cat(x, 1)
         return self.linear(self.drop(self.pool(self.conv(x)).flatten(1)))
+
+# ---------------------------------------------------------------------#
+# SE注意力机制模块
+# Paper: https://arxiv.org/abs/1709.01507
+# ---------------------------------------------------------------------#
+class SE(nn.Module):
+    """
+    Squeeze-and-Excitation注意力模块
+    作用：让模型自动关注重要的通道特征
+    
+    Args:
+        c1: 输入通道数（必须指定）
+        r: 降维比例，默认16（配置文件中第二个参数）
+        c2: 输出通道数（与c1相同，通常省略）
+    """
+    def __init__(self, c1=1, r=16, c2=None):
+        super(SE, self).__init__()
+        if c2 is None:
+            c2 = c1
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.l1 = nn.Linear(c1, c1 // r, bias=False)
+        self.relu = nn.ReLU(inplace=True)
+        self.l2 = nn.Linear(c1 // r, c2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+    
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avgpool(x).view(b, c)
+        y = self.sigmoid(self.l2(self.relu(self.l1(y)))).view(b, c, 1, 1)
+        return x * y
+
+
+# ---------------------------------------------------------------------#
+# ECA注意力机制模块
+# Paper: https://arxiv.org/abs/1910.03151
+# 比SE更轻量，使用1D卷积代替全连接层
+# ---------------------------------------------------------------------#
+class ECA(nn.Module):
+    """
+    Efficient Channel Attention注意力模块
+    作用：比SE更轻量的通道注意力，速度更快
+    
+    Args:
+        c1: 输入通道数（必须指定）
+        k_size: 卷积核大小，默认3（可选，通常3或5）
+    """
+    def __init__(self, c1, k_size=3):
+        super(ECA, self).__init__()
+        self.avgpool = nn.AdaptiveAvgPool2d(1)
+        self.conv = nn.Conv1d(1, 1, kernel_size=k_size, padding=(k_size - 1) // 2, bias=False)
+        self.sigmoid = nn.Sigmoid()
+
+    def forward(self, x):
+        b, c, _, _ = x.size()
+        y = self.avgpool(x).view(b, 1, c)
+        y = self.conv(y).view(b, c, 1, 1)
+        return x * self.sigmoid(y)
