@@ -14,24 +14,24 @@ train:
   det_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/train.py  # 检测训练脚本
   seg_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/segment/train.py  # 分割训练脚本
   mode: det                 # det或seg
-  
+
   # DDP训练配置
   ddp:
     enable: 1               # 是否开启DDP训练
     nproc_per_node: 2       # 每个节点使用的GPU数量
     device: 0,1             # 使用的GPU设备ID
-  
+
   # 权重配置
   weights: /home/user/cv_project/corn-detection/yolov5-rknn-self/yolov5s.pt  # 初始权重路径
-  
+
   # 恢复训练配置
   resume:
     open: 0                 # 是否开启恢复训练
     model_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/20260511黄白冻玉米检测模型/weights/best.pt  # 恢复训练权重路径
-  
+
   # 核心训练参数
   core_params:
-    # object-det: 0            # 项目特定参数
+    # object-seg: 0            # 项目特定参数
     project: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train  # 训练结果保存目录
     name: 20260511黄白冻玉米检测模型  # 本次训练模型名称
     hyp: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/hyps/hyp.corn_grading_det_finetune.yaml  # 超参数文件路径
@@ -43,7 +43,7 @@ train:
     save_period: 100         # 权重保存间隔
     # img_size: 640           # 输入图像大小
     # seed: 42                # 随机种子
-  
+
   # 扩展训练参数
   extra_params:
     # lr0: 0.01               # 初始学习率
@@ -52,12 +52,12 @@ train:
     # iou_train: 0.7          # 训练时的IOU阈值
     # augment: true           # 是否使用数据增强
     # multi_scale: true       # 是否使用多尺度训练
-  
+
   # 日志配置
   log:
     redirect: 1             # 是否重定向日志
     log_file: /home/user/cv_project/corn-detection/yolov5-rknn-self/train_log/20260511-dong-huangbai-det/20260511-dong-huangbai-det.out   # 日志文件路径
-  
+
   # 环境记录配置
   env_record:
     enable: 1               # 是否记录环境信息
@@ -65,7 +65,7 @@ train:
     save_requirements: 1    # 是否保存依赖列表
     save_config: 1          # 是否备份当前配置文件
     save_system_info: 1     # 是否保存系统信息
-  
+
   # 模型转换配置
   model_conversion:
     enable: 1              # 是否启用模型转换
@@ -83,7 +83,7 @@ train:
   label_alignment:
     enable: 1              # 是否启用标签对齐（仅对det模式有效）
     script_path: /home/user/cv_project/python_tool/shell/pre_process/Label_alignment.py  # 标签对齐脚本路径
-    
+
 # 测试配置
 test:
   open: 1                   # 是否开启测试任务
@@ -91,7 +91,7 @@ test:
   det_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/detect.py  # 检测测试脚本
   seg_script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/segment/predict.py  # 分割测试脚本
   mode: det                 # det或seg，可独立配置
-  
+
   # 核心测试参数
   core_params:
     iou_threshold: 0.5      # IOU阈值
@@ -101,31 +101,31 @@ test:
     name: 20260511-dong-huangbai-det   # 测试结果子目录名
     save_txt: true          # 是否保存检测结果为TXT
     # save_conf: true         # 是否保存置信度
-  
+
   # 扩展测试参数
   extra_params:
     # visualize: true         # 是否可视化结果
     # agnostic_nms: true      # 是否使用类别无关的NMS
     # max_det: 1000           # 最大检测数量
-  
+
   # 测试触发配置
   test_trigger:
     test_on_save: 1         # 保存权重时是否进行测试
     test_final: 1           # 训练结束后是否测试last.pt和best.pt
     test_interval: 5  # 测试间隔
-  
+
   # 直接测试配置
   direct_test:
     open: 0                 # 是否开启直接测试模式（不训练，只测试）
     weights: [
       /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/xianguo-det-cls4-0129/weights/best.pt
     ]             # 直接测试的权重文件列表，支持多个权重文件
-  
+
   # 权重管理配置
   weight_management:
     delete_after_test: 1    # 测试完后是否删除中间权重文件（epoch*.pt），0-不删除，1-删除
     delete_log: 1           # 删除权重时是否记录日志，0-不记录，1-记录
-  
+
   # 测试数据集配置
   dataset_config:
     open: 1                 # 是否启用测试数据集配置
@@ -134,9 +134,9 @@ test:
         img_path: /data/test_data/corn/test_dataset/huangbai/dong/det/20250924_huangbai_corn_grading_det_dataset1_test  # 父目录
         img_subdir: images   # 图片子目录名
         label_subdir: labels  # 标签子目录名
-     
+
     zip: 0                  # 测试结果是否压缩（1-压缩，0-不压缩）
-    
+
     # 像素过滤配置
     pixel_filter:
       enable: 1          # 0-禁用，1-启用
@@ -144,7 +144,7 @@ test:
       right: 0             # 右侧过滤像素数
       top: 0               # 顶部过滤像素数
       bottom: 50            # 底部过滤像素数
-  
+
   # 结果保存配置
   result:
     format: xlsx            # 结果格式
@@ -161,7 +161,7 @@ test:
 class_config:
   type: det                 # 类别类型
   classes:                  # 类别对照表
-    0: 
+    0:
       id: 0
       name: corn
       cn_name: 玉米
@@ -171,7 +171,7 @@ class_config:
       cn_name: 秃尖
   # type: det                 # 类别类型
   # classes:                  # 类别对照表
-  #   0: 
+  #   0:
   #     id: 0
   #     name: queli
   #     cn_name: 缺粒
@@ -190,13 +190,13 @@ class_config:
   #   4:
   #     id: 4
   #     name: meichong
-  #     cn_name: 霉虫   
+  #     cn_name: 霉虫
   #   5:
   #     id: 5
   #     name: duanlie
   #     cn_name: 断裂
   #   6:
-  #     id: 6     
+  #     id: 6
   #     name: jiya
   #     cn_name: 挤压
   #   7:
@@ -208,14 +208,14 @@ class_config:
 # SFTP推送配置
 sftp:
   open: 0                  # 是否开启SFTP推送功能
-  
+
   # 远程设备信息
   host: "10.17.3.150"  # 板子的 IP 地址
   port: 22  # SFTP 端口号
   username: "root"  # 用户名
   password: "sbdquad1"  # 密码
   # private_key: "/path/to/private_key"  # 私钥路径（如果使用密钥认证）
-  
+
   # 多文件推送配置
   files:
     - local_file: "/home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train/xianguo-det-cls4-0129/weights/xianguo_cls_0129_encrypt.rknn"  # 本地模型文件路径
@@ -230,10 +230,10 @@ sftp:
     - local_file: "/home/user/cv_project/corn-detection/yolov5-rknn-self/automation/config.yaml"
       remote_dir: "/userdata/nvme_ssd/push_test/0129"
       remote_file: "config.yaml"
-  
+
   # 超时配置
   timeout: 30  # 连接超时时间（秒）
-  
+
   # 远程执行脚本配置
   remote_exec:
     enable: 1             # 是否开启远程执行功能
@@ -259,7 +259,7 @@ board_test:
 # 微信推送配置
 wechat:
   open: 1                  # 是否开启微信推送
-  
+
   # 基础配置（与 send_message 方法参数对应）
   base:
     python_tool_path: "/home/user/cv_project/python_tool/python"  # Python工具路径
@@ -270,7 +270,7 @@ wechat:
     timeout_s: 10            # HTTP超时时间
     trust_env: 0             # 是否信任环境变量
     markdown: 1              # 默认使用markdown格式
-  
+
   # 消息节点配置（哪些节点需要推送消息）
   nodes:
     train_start: 1           # 训练开始
@@ -280,7 +280,7 @@ wechat:
     error: 1                 # 错误信息
     sftp_push: 0             # SFTP推送
     board_test: 0            # 板子测试
-  
+
   # 消息模板配置
   templates:
     train_start:             # 训练开始模板

@@ -71,7 +71,7 @@ train:
     script_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/output_rknn.sh  # 转换脚本路径
     convert_after_train: 1  # 1：训练结束进行转换 0：不训练亦可进行转换(一般用于直接测试)
     convert_weights:        # 需要转换的权重文件
-      - /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20260224鲜紫黑玉米缺陷分割模型/weights/best.pt
+      - /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20260313鲜紫黑玉米缺陷分割模型/weights/best.pt
     # rknn_output_path: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train-seg/20260129鲜黄玉米缺陷分割模型/weights  # RKNN模型输出路径
     custom_name: 20260224_zihei_xian_corn_seg  # 自定义RKNN文件名（可选），默认使用权重文件名
     params:                 # 模型转换额外参数

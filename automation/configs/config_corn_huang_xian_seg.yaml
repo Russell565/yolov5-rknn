@@ -124,12 +124,20 @@ test:
   dataset_config:
     open: 1                 # 是否启用测试数据集配置
     datasets:               # 测试数据集列表
-      - name: 20260104_huang_corn_grading_det_part15  # 数据集名称
-        img_path: /data/test_data/corn/test_dataset/huang/xian-seg/20260104_huang_corn_grading_det_part15  # 父目录
+      - name: 20260104_huang_corn_grading_seg_part31  # 数据集名称
+        img_path: /data/test_data/corn/test_dataset/huang/xian/seg/20260104_huang_corn_grading_seg_part31  # 父目录
         img_subdir: images   # 图片子目录名
         label_subdir: labels_seg  # 标签子目录名
-      - name: 20260104_huang_corn_grading_det_part16
-        img_path: /data/test_data/corn/test_dataset/huang/xian-seg/20260104_huang_corn_grading_det_part16 
+      - name: 20260104_huang_corn_grading_seg_part32  # 数据集名称
+        img_path: /data/test_data/corn/test_dataset/huang/xian/seg/20260104_huang_corn_grading_seg_part32  # 父目录
+        img_subdir: images
+        label_subdir: labels_seg
+      - name: 20260104_huang_corn_grading_seg_part33  # 数据集名称
+        img_path: /data/test_data/corn/test_dataset/huang/xian/seg/20260104_huang_corn_grading_seg_part33  # 父目录
+        img_subdir: images
+        label_subdir: labels_seg
+      - name: 20260604_huang_corn_grading_seg_test # 数据集名称
+        img_path: /data/train_data/dataset/corn_det_project/classified_corn/huang/xian/seg/20260604_huang_corn_grading_seg_dataset/test  # 父目录
         img_subdir: images
         label_subdir: labels_seg
     zip: 0                  # 测试结果是否压缩（1-压缩，0-不压缩）

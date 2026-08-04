@@ -30,7 +30,7 @@ train:
 
   # 核心训练参数
   core_params:
-    # object-det: 0            # 项目特定参数
+    # object-seg: 0            # 项目特定参数
     project: /home/user/cv_project/corn-detection/yolov5-rknn-self/runs/train  # 训练结果保存目录
     name: 20260507黄鲜玉米检测模型测试se  # 本次训练模型名称
     hyp: /home/user/cv_project/corn-detection/yolov5-rknn-self/data/hyps/hyp.corn_grading_det_finetune.yaml  # 超参数文件路径
