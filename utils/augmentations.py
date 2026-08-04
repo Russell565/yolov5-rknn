@@ -29,14 +29,23 @@ class Albumentations:
             check_version(A.__version__, '1.0.3', hard=True)  # version requirement
 
             T = [
-                A.RandomResizedCrop(height=size, width=size, scale=(0.8, 1.0), ratio=(0.9, 1.11), p=0.0),
-                A.Blur(p=0.1),
-                A.MedianBlur(p=0.1),
-                A.ToGray(p=0.1),
-                A.CLAHE(p=0.1),
-                A.RandomBrightnessContrast(p=0.5),
-                A.RandomGamma(p=0.3),
-                A.ImageCompression(quality_lower=75, p=0.0)]  # transforms
+                A.RandomResizedCrop(height=size, width=size, scale=(0.8, 1.0), ratio=(0.9, 1.11), p=0.0),  # 随机裁剪并调整大小，增强模型对不同尺度目标的识别能力
+                A.Blur(p=0.1),  # 图像模糊，增强模型对模糊图像的鲁棒性
+                A.MedianBlur(p=0.1),  # 中值滤波模糊，增强模型对椒盐噪声的鲁棒性
+                A.ToGray(p=0.1),  # 灰度转换，增强模型对颜色变化的鲁棒性
+                A.CLAHE(p=0.1),  # 对比度受限的自适应直方图均衡化，增强图像对比度
+                A.RandomBrightnessContrast(p=0.5),  # 随机调整亮度和对比度，增强模型对亮度变化的鲁棒性
+                A.RandomGamma(p=0.3),  # 随机伽马校正，增强模型对伽马变化的鲁棒性
+                A.ImageCompression(quality_lower=75, p=0.0), # 图像压缩，模拟JPEG压缩失真，增强模型对压缩图像的鲁棒性
+
+                A.GaussianBlur(p=0.1, blur_limit=(3, 5)),  # 高斯模糊，增强模型对高斯噪声的鲁棒性
+                A.MotionBlur(p=0.1),  # 运动模糊，增强模型对运动目标的鲁棒性
+                A.CoarseDropout(p=0, max_holes=4, max_height=16, max_width=16),  # 随机裁剪(即遮挡)，增强模型对目标部分遮挡的鲁棒性
+                A.RandomShadow(p=0.1, num_shadows_lower=1, num_shadows_upper=2, shadow_dimension=5, shadow_roi=(0, 0, 1, 1)),  # 随机阴影，增强模型对阴影环境的鲁棒性
+                A.GaussNoise(p=0.1, var_limit=(10, 30)), # 高斯噪声，增强模型对高斯噪声的鲁棒性
+                A.ISONoise(p=0.1, intensity=(0.1, 0.3), color_shift=(0.01, 0.05)), # ISO噪声（模拟相机传感器噪声），增强模型对传感器噪声的鲁棒性
+                A.MultiplicativeNoise(p=0.1, multiplier=(0.9, 1.1)), # 乘性噪声（模拟光照不均匀），增强模型对光照不均匀的鲁棒性
+                ]  
             self.transform = A.Compose(T, bbox_params=A.BboxParams(format='yolo', label_fields=['class_labels']))
 
             LOGGER.info(prefix + ', '.join(f'{x}'.replace('always_apply=False, ', '') for x in T if x.p))
